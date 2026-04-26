@@ -1,0 +1,21 @@
+# dependencies
+node_modules
+.pnpm-store
+
+# build outputs
+.next
+dist
+build
+out
+
+# env
+.env
+.env.local
+.env.*.local
+apps/web/.env.local
+
+# misc
+.DS_Store
+*.pem
+.turbo
+.vercel

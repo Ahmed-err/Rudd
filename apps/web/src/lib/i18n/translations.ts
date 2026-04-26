@@ -1,0 +1,273 @@
+export type Locale = "en" | "ar";
+
+export const translations = {
+  en: {
+    locale: "en" as Locale,
+    dir: "ltr" as const,
+
+    nav: {
+      brand: "Rudd",
+      conversations: "Conversations",
+      appointments: "Appointments",
+      settings: "Settings",
+    },
+
+    home: {
+      tagline: "WhatsApp AI Appointment Agent",
+      signIn: "Sign In",
+      createAccount: "Create Account",
+    },
+
+    conversations: {
+      title: "Conversations",
+      empty: "No conversations yet.",
+      status: { active: "active", resolved: "resolved", escalated: "escalated" },
+      detail: {
+        back: "← Back",
+        noMessages: "No messages yet.",
+        you: "Agent",
+      },
+    },
+
+    appointments: {
+      title: "Appointments",
+      empty: "No appointments yet.",
+      columns: {
+        customer: "Customer",
+        service: "Service",
+        dateTime: "Date & Time",
+        status: "Status",
+        calendar: "Calendar",
+      },
+      synced: "Synced",
+      notSynced: "Not synced",
+      status: { scheduled: "scheduled", completed: "completed", cancelled: "cancelled" },
+    },
+
+    settings: {
+      title: "Settings",
+      tabs: { agent: "Agent", services: "Services", hours: "Hours", integrations: "Integrations" },
+      agent: {
+        title: "AI Agent Settings",
+        description: "Configure how the agent presents itself to customers.",
+        businessName: "Business Name",
+        timezone: "Timezone",
+        instructions: "Custom Instructions (optional)",
+        instructionsPlaceholder: "Extra instructions for the AI agent...",
+        save: "Save Settings",
+        saving: "Saving...",
+      },
+      services: {
+        title: "Services",
+        description: "The appointments your customers can book via WhatsApp.",
+        empty: "No services yet.",
+        namePlaceholder: "Service name",
+        durationPlaceholder: "Min",
+        add: "Add",
+        remove: "Remove",
+        save: "Save Services",
+        saving: "Saving...",
+        durationUnit: "min",
+      },
+      hours: {
+        title: "Working Hours",
+        description: "Set when your business accepts bookings.",
+        save: "Save Hours",
+        saving: "Saving...",
+        days: {
+          mon: "Monday",
+          tue: "Tuesday",
+          wed: "Wednesday",
+          thu: "Thursday",
+          fri: "Friday",
+          sat: "Saturday",
+          sun: "Sunday",
+        },
+      },
+      integrations: {
+        calendarTitle: "Google Calendar",
+        calendarDescription: "Connect your Google Calendar to sync appointments automatically.",
+        connected: "Connected",
+        connect: "Connect Google Calendar",
+        reconnect: "Reconnect",
+        successMsg: "Google Calendar connected successfully.",
+        errorDenied: "Google Calendar connection was cancelled.",
+        errorGeneric: "Failed to connect Google Calendar. Please try again.",
+        waTitle: "WhatsApp Business",
+        waDescription: "Connect your WhatsApp Business API phone number to receive and send messages.",
+        waPhoneNumberId: "Phone Number ID",
+        waPhoneNumberIdPlaceholder: "e.g. 123456789012345",
+        waBusinessAccountId: "Business Account ID",
+        waBusinessAccountIdPlaceholder: "e.g. 123456789012345",
+        waAccessToken: "Permanent Access Token",
+        waAccessTokenPlaceholder: "System user token from Meta Developer portal",
+        waConnect: "Connect WhatsApp",
+        waConnecting: "Connecting...",
+        waDisconnect: "Disconnect",
+        waConnectedLabel: "Connected",
+      },
+    },
+
+    onboarding: {
+      welcome: "Welcome to Rudd",
+      createWorkspace: "First, create your business workspace.",
+      setup: {
+        title: "Set up your business",
+        description: "Tell the AI agent about your services.",
+        cardTitle: "Business Details",
+        cardDescription: "Your AI agent uses this to book appointments.",
+        businessName: "Business Name",
+        businessNamePlaceholder: "e.g. Ahmed's Clinic",
+        timezone: "Timezone",
+        timezonePlaceholder: "e.g. Asia/Riyadh",
+        services: "Services",
+        finish: "Go to Dashboard",
+        finishing: "Finishing setup...",
+        error: "Setup failed. Please try again.",
+      },
+    },
+
+    errors: {
+      noTenant: "No tenant found for this organization.",
+      tryAgain: "Try again",
+      goHome: "Go home",
+      somethingWrong: "Something went wrong",
+    },
+  },
+
+  ar: {
+    locale: "ar" as Locale,
+    dir: "rtl" as const,
+
+    nav: {
+      brand: "رود",
+      conversations: "المحادثات",
+      appointments: "المواعيد",
+      settings: "الإعدادات",
+    },
+
+    home: {
+      tagline: "وكيل الذكاء الاصطناعي لحجز المواعيد عبر واتساب",
+      signIn: "تسجيل الدخول",
+      createAccount: "إنشاء حساب",
+    },
+
+    conversations: {
+      title: "المحادثات",
+      empty: "لا توجد محادثات بعد.",
+      status: { active: "نشط", resolved: "محلول", escalated: "مُحوَّل" },
+      detail: {
+        back: "→ رجوع",
+        noMessages: "لا توجد رسائل بعد.",
+        you: "الوكيل",
+      },
+    },
+
+    appointments: {
+      title: "المواعيد",
+      empty: "لا توجد مواعيد بعد.",
+      columns: {
+        customer: "العميل",
+        service: "الخدمة",
+        dateTime: "التاريخ والوقت",
+        status: "الحالة",
+        calendar: "التقويم",
+      },
+      synced: "متزامن",
+      notSynced: "غير متزامن",
+      status: { scheduled: "مجدول", completed: "مكتمل", cancelled: "ملغى" },
+    },
+
+    settings: {
+      title: "الإعدادات",
+      tabs: { agent: "الوكيل", services: "الخدمات", hours: "ساعات العمل", integrations: "التكاملات" },
+      agent: {
+        title: "إعدادات وكيل الذكاء الاصطناعي",
+        description: "اضبط طريقة تقديم الوكيل لنفسه للعملاء.",
+        businessName: "اسم العمل",
+        timezone: "المنطقة الزمنية",
+        instructions: "تعليمات مخصصة (اختياري)",
+        instructionsPlaceholder: "تعليمات إضافية للوكيل...",
+        save: "حفظ الإعدادات",
+        saving: "جار الحفظ...",
+      },
+      services: {
+        title: "الخدمات",
+        description: "المواعيد التي يمكن لعملائك حجزها عبر واتساب.",
+        empty: "لا توجد خدمات بعد.",
+        namePlaceholder: "اسم الخدمة",
+        durationPlaceholder: "دقيقة",
+        add: "إضافة",
+        remove: "حذف",
+        save: "حفظ الخدمات",
+        saving: "جار الحفظ...",
+        durationUnit: "دقيقة",
+      },
+      hours: {
+        title: "ساعات العمل",
+        description: "حدد متى يقبل عملك الحجوزات.",
+        save: "حفظ ساعات العمل",
+        saving: "جار الحفظ...",
+        days: {
+          mon: "الاثنين",
+          tue: "الثلاثاء",
+          wed: "الأربعاء",
+          thu: "الخميس",
+          fri: "الجمعة",
+          sat: "السبت",
+          sun: "الأحد",
+        },
+      },
+      integrations: {
+        calendarTitle: "تقويم جوجل",
+        calendarDescription: "اربط تقويم جوجل لمزامنة المواعيد تلقائياً.",
+        connected: "متصل",
+        connect: "ربط تقويم جوجل",
+        reconnect: "إعادة الربط",
+        successMsg: "تم ربط تقويم جوجل بنجاح.",
+        errorDenied: "تم إلغاء ربط تقويم جوجل.",
+        errorGeneric: "فشل ربط تقويم جوجل. يرجى المحاولة مجدداً.",
+        waTitle: "واتساب للأعمال",
+        waDescription: "اربط رقم هاتف واتساب للأعمال لاستقبال الرسائل وإرسالها.",
+        waPhoneNumberId: "معرّف رقم الهاتف",
+        waPhoneNumberIdPlaceholder: "مثال: 123456789012345",
+        waBusinessAccountId: "معرّف حساب الأعمال",
+        waBusinessAccountIdPlaceholder: "مثال: 123456789012345",
+        waAccessToken: "رمز الوصول الدائم",
+        waAccessTokenPlaceholder: "رمز المستخدم النظامي من بوابة Meta للمطورين",
+        waConnect: "ربط واتساب",
+        waConnecting: "جار الربط...",
+        waDisconnect: "قطع الاتصال",
+        waConnectedLabel: "متصل",
+      },
+    },
+
+    onboarding: {
+      welcome: "مرحباً بك في رود",
+      createWorkspace: "أولاً، أنشئ مساحة عمل عملك.",
+      setup: {
+        title: "إعداد عملك",
+        description: "أخبر وكيل الذكاء الاصطناعي عن خدماتك.",
+        cardTitle: "تفاصيل العمل",
+        cardDescription: "يستخدم وكيل الذكاء الاصطناعي هذه المعلومات لحجز المواعيد.",
+        businessName: "اسم العمل",
+        businessNamePlaceholder: "مثال: عيادة أحمد",
+        timezone: "المنطقة الزمنية",
+        timezonePlaceholder: "مثال: Asia/Riyadh",
+        services: "الخدمات",
+        finish: "الذهاب إلى لوحة التحكم",
+        finishing: "جار إكمال الإعداد...",
+        error: "فشل الإعداد. يرجى المحاولة مجدداً.",
+      },
+    },
+
+    errors: {
+      noTenant: "لم يتم العثور على مستأجر لهذه المؤسسة.",
+      tryAgain: "المحاولة مجدداً",
+      goHome: "الصفحة الرئيسية",
+      somethingWrong: "حدث خطأ ما",
+    },
+  },
+} as const;
+
+export type T = typeof translations.en;

@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "contacts_tenant_wa_id_idx" ON "contacts" USING btree ("tenant_id","wa_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "conversations_tenant_contact_idx" ON "conversations" USING btree ("tenant_id","contact_id");
