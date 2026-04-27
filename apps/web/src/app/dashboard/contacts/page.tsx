@@ -53,7 +53,7 @@ export default async function ContactsPage() {
                     {c.lastSeen ? new Date(c.lastSeen).toLocaleDateString(t.locale) : "—"}
                   </TableCell>
                   <TableCell>
-                    <Link href="/dashboard/conversations">
+                    <Link href={`/dashboard/conversations?waId=${encodeURIComponent(c.waId)}`}>
                       <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
                         {t.contacts.viewConversations}
                       </Button>

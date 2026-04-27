@@ -2,6 +2,7 @@ import { env } from "@/lib/env";
 import { inngest } from "@/server/inngest/client";
 import { waWebhookPayloadSchema } from "@/server/whatsapp/schema";
 import { verifyWhatsAppSignature } from "@/server/whatsapp/verify";
+import { rateLimit } from "@/lib/rate-limit";
 import { NextResponse, type NextRequest } from "next/server";
 
 // GET — Meta webhook verification handshake
@@ -21,6 +22,11 @@ export const GET = (req: NextRequest): NextResponse => {
 // POST — inbound messages from Meta
 // Returns 200 immediately; all heavy work runs in after() so Meta never times out.
 export const POST = async (req: NextRequest): Promise<NextResponse> => {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (!rateLimit(`wa:${ip}`, 60, 60_000)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const rawBody = await req.text();
   const signature = req.headers.get("x-hub-signature-256") ?? "";
 

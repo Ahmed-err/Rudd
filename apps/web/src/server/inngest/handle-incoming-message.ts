@@ -47,7 +47,6 @@ export const handleIncomingMessage = inngest.createFunction(
       const [waAccount] = await db
         .select({
           tenantId: waAccounts.tenantId,
-          assistantId: tenants.openaiAssistantId,
           businessName: agentSettings.businessName,
           systemPrompt: agentSettings.systemPromptOverride,
           services: agentSettings.services,

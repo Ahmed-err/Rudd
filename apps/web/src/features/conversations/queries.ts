@@ -12,7 +12,15 @@ export type ConversationRow = {
   lastMessageDirection: string | null;
 };
 
-export const listConversations = async (tenantId: string, status?: string): Promise<ConversationRow[]> => {
+export const listConversations = async (
+  tenantId: string,
+  status?: string,
+  waId?: string,
+): Promise<ConversationRow[]> => {
+  const conditions = [eq(conversations.tenantId, tenantId)];
+  if (status) conditions.push(eq(conversations.status, status));
+  if (waId) conditions.push(eq(contacts.waId, waId));
+
   const rows = await db
     .select({
       id: conversations.id,
@@ -23,11 +31,7 @@ export const listConversations = async (tenantId: string, status?: string): Prom
     })
     .from(conversations)
     .innerJoin(contacts, eq(conversations.contactId, contacts.id))
-    .where(
-      status
-        ? and(eq(conversations.tenantId, tenantId), eq(conversations.status, status))
-        : eq(conversations.tenantId, tenantId),
-    )
+    .where(and(...conditions))
     .orderBy(desc(conversations.lastMessageAt));
 
   const withLastMsg = await Promise.all(
@@ -100,19 +104,3 @@ export const getConversationDetail = async (
   return { conversation: row, messages: msgs };
 };
 
-export const getConversationMessages = async (
-  tenantId: string,
-  conversationId: string,
-): Promise<MessageRow[]> => {
-  return db
-    .select({
-      id: messages.id,
-      role: messages.role,
-      direction: messages.direction,
-      body: messages.body,
-      createdAt: messages.createdAt,
-    })
-    .from(messages)
-    .where(and(eq(messages.conversationId, conversationId), eq(messages.tenantId, tenantId)))
-    .orderBy(messages.createdAt);
-};

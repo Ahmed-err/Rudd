@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, jsonb, varchar, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, jsonb, varchar, uniqueIndex } from "drizzle-orm/pg-core";
 
 // ── Tenants (mirrors Clerk Organizations) ─────────────────────────────────────
 export const tenants = pgTable("tenants", {

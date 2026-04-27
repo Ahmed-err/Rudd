@@ -12,16 +12,20 @@ const FILTERS = ["all", "active", "escalated", "resolved"] as const;
 export default async function ConversationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; waId?: string }>;
 }) {
-  const [{ tenantId }, t, { status }] = await Promise.all([
+  const [{ tenantId }, t, { status, waId }] = await Promise.all([
     getSessionTenant(),
     getT(),
     searchParams,
   ]);
 
   const activeFilter = FILTERS.includes(status as typeof FILTERS[number]) ? status : "all";
-  const conversations = await listConversations(tenantId, activeFilter === "all" ? undefined : activeFilter);
+  const conversations = await listConversations(
+    tenantId,
+    activeFilter === "all" ? undefined : activeFilter,
+    waId,
+  );
 
   const statusColor: Record<string, string> = {
     active: "bg-green-100 text-green-800",
@@ -33,6 +37,14 @@ export default async function ConversationsPage({
     <div className="space-y-4">
       <AutoRefresh intervalMs={10000} />
       <h1 className="text-2xl font-semibold">{t.conversations.title}</h1>
+
+      {/* Contact filter banner */}
+      {waId && (
+        <div className="flex items-center gap-2 text-sm bg-muted px-3 py-2 rounded-md">
+          <span className="text-muted-foreground">{t.conversations.filteringBy} <strong>{waId}</strong></span>
+          <Link href="/dashboard/conversations" className="text-primary hover:underline text-xs">✕</Link>
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div className="flex gap-1 flex-wrap">
