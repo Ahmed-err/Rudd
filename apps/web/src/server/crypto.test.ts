@@ -26,7 +26,7 @@ describe("encrypt / decrypt", () => {
   it("throws on tampered ciphertext", async () => {
     const { encrypt, decrypt } = await getCrypto();
     const ct = await encrypt("secret");
-    const tampered = ct.slice(0, -4) + "XXXX";
+    const tampered = `${ct.slice(0, -4)}XXXX`;
     await expect(decrypt(tampered)).rejects.toThrow();
   });
 

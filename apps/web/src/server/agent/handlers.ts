@@ -7,7 +7,6 @@ import {
   captureLeadSchema,
   escalateToHumanSchema,
   getAvailabilitySchema,
-  listServicesSchema,
   proposeSlotsSchema,
 } from "./tools";
 import {
@@ -83,14 +82,14 @@ export const handleGetAvailability = async (
 // ── propose_slots ──────────────────────────────────────────────────────────────
 export const handleProposeSlots = async (
   rawArgs: unknown,
-  { tenantId }: HandlerContext,
+  { tenantId: _tenantId }: HandlerContext,
 ): Promise<string> => {
   const args = proposeSlotsSchema.parse(rawArgs);
 
   // Simple slot generation: return `count` slots starting from date_from at 9am, spaced 1 day apart
   // The agent will format these nicely for the user
   const slots = [];
-  const start = new Date(args.date_from + "T09:00:00");
+  const start = new Date(`${args.date_from}T09:00:00`);
   for (let i = 0; i < args.count; i++) {
     const slotStart = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
     const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000);
@@ -148,7 +147,7 @@ export const handleBookAppointment = async (
     await db
       .update(appointments)
       .set({ gcalEventId })
-      .where(eq(appointments.id, appt!.id));
+      .where(eq(appointments.id, appt?.id ?? ""));
   } catch (err) {
     // Calendar not connected or failed — appointment still saved in DB
     console.warn("[handlers] GCal createEvent skipped:", err);
@@ -156,7 +155,7 @@ export const handleBookAppointment = async (
 
   return JSON.stringify({
     success: true,
-    appointment_id: appt!.id,
+    appointment_id: appt?.id,
     start: startAt.toISOString(),
     end: endAt.toISOString(),
     calendar_synced: !!gcalEventId,

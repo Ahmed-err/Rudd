@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { Webhook } from "svix";
 import { z } from "zod";

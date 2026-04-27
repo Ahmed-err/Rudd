@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { type Locale } from "./translations";
+import type { Locale } from "./translations";
 import { LOCALE_COOKIE } from "./server";
 
 export const setLocale = async (locale: Locale): Promise<void> => {

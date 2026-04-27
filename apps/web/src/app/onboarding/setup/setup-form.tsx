@@ -30,7 +30,7 @@ export const SetupForm = ({ defaultBusinessName, t }: Props) => {
 
   const addService = () => {
     const name = newName.trim();
-    const dur = parseInt(newDuration, 10);
+    const dur = Number.parseInt(newDuration, 10);
     if (!name || !dur) return;
     setServices((prev) => [
       ...prev,
@@ -105,7 +105,7 @@ export const SetupForm = ({ defaultBusinessName, t }: Props) => {
                 placeholder={t.businessNamePlaceholder}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addService())}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addService(); } }}
                 className="flex-1"
               />
               <Input

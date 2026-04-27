@@ -6,7 +6,7 @@ import { verifyWhatsAppSignature } from "./verify";
 const TEST_SECRET = "test_secret";
 const TEST_BODY = '{"object":"test"}';
 // pre-computed expected HMAC-SHA256
-const VALID_SIGNATURE =
+const _VALID_SIGNATURE =
   "sha256=8bb3af76da9b8e83f5d8c1db8e9b29e6d4a8f0e14b5e9e6e3a7f2b1c4d5e6f7a";
 
 // Compute a real HMAC so the test doesn't rely on a hardcoded golden value

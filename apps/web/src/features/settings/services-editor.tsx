@@ -21,7 +21,7 @@ export const ServicesEditor = ({ initial, t }: Props) => {
 
   const add = () => {
     const trimmed = name.trim();
-    const dur = parseInt(duration, 10);
+    const dur = Number.parseInt(duration, 10);
     if (!trimmed || !dur) return;
     setServices((prev) => [
       ...prev,
@@ -62,7 +62,7 @@ export const ServicesEditor = ({ initial, t }: Props) => {
           placeholder={t.namePlaceholder}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), add())}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
           className="flex-1"
         />
         <Input

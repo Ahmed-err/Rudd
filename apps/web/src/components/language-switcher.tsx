@@ -11,6 +11,7 @@ export const LanguageSwitcher = ({ current }: { current: Locale }) => {
 
   return (
     <button
+      type="button"
       onClick={() => startTransition(() => setLocale(next))}
       disabled={isPending}
       className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded"

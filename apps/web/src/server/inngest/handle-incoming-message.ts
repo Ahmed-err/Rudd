@@ -9,7 +9,7 @@ import {
   waAccounts,
   webhookEvents,
 } from "@rudd/db";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { inngest } from "./client";
 import { runAssistant } from "../agent/runner";
 import { sendWhatsAppMessage } from "../whatsapp/client";
@@ -74,7 +74,8 @@ export const handleIncomingMessage = inngest.createFunction(
           set: { name: contactName ?? contacts.name },
         })
         .returning({ id: contacts.id });
-      return row!.id;
+      if (!row) throw new Error("Failed to upsert contact");
+      return row.id;
     });
 
     // ── 3. Upsert conversation (atomic — unique index on tenantId+contactId) ──
@@ -87,7 +88,8 @@ export const handleIncomingMessage = inngest.createFunction(
           set: { lastMessageAt: new Date() },
         })
         .returning({ id: conversations.id });
-      return row!.id;
+      if (!row) throw new Error("Failed to upsert conversation");
+      return row.id;
     });
 
     // ── 4. Persist inbound message (idempotent on waMessageId) ─────────────

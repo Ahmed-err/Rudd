@@ -11,10 +11,9 @@ import { dispatchToolCall } from "./handlers";
 const parseTextFunctionCalls = (content: string): Array<{ name: string; args: unknown }> => {
   const results: Array<{ name: string; args: unknown }> = [];
   const re = /<function=([a-z_]+)>([\s\S]*?)<\/function>/g;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(content)) !== null) {
-    const name = match[1]!;
-    const raw = match[2]!.trim();
+  for (let match = re.exec(content); match !== null; match = re.exec(content)) {
+    const name = match[1] ?? "";
+    const raw = match[2]?.trim();
     let args: unknown = {};
     try { args = raw ? JSON.parse(raw) : {}; } catch { args = {}; }
     results.push({ name, args });
@@ -118,7 +117,7 @@ export const runAssistant = async (input: RunnerInput): Promise<string> => {
     ...history
       .reverse()
       .filter((m) => m.body && (m.role === "user" || m.role === "assistant"))
-      .map((m) => ({ role: m.role as "user" | "assistant", content: m.body! })),
+      .map((m) => ({ role: m.role as "user" | "assistant", content: m.body ?? "" })),
     { role: "user", content: input.userMessage },
   ];
 
@@ -155,7 +154,8 @@ export const runAssistant = async (input: RunnerInput): Promise<string> => {
     // Handle text-format tool calls by re-injecting them as proper tool_calls
     if (textFnCalls.length && !msg.tool_calls?.length) {
       const cleanContent = stripMarkdown(msg.content ?? "");
-      const fakeTc = textFnCalls[0]!;
+      const fakeTc = textFnCalls[0];
+      if (!fakeTc) continue;
       const fakeId = `text_fn_${round}`;
       chatMessages[chatMessages.length - 1] = {
         ...msg,
@@ -179,7 +179,7 @@ export const runAssistant = async (input: RunnerInput): Promise<string> => {
     }
 
     // Execute structured tool calls sequentially
-    for (const tc of msg.tool_calls!) {
+    for (const tc of msg.tool_calls ?? []) {
       let output: string;
       try {
         const fnName = "function" in tc ? tc.function.name : "";
@@ -189,7 +189,7 @@ export const runAssistant = async (input: RunnerInput): Promise<string> => {
         output = await dispatchToolCall(fnName, args, handlerCtx);
         console.log(`[agent] tool result: ${output}`);
       } catch (err) {
-        console.error(`[agent] tool error:`, err);
+        console.error("[agent] tool error:", err);
         output = JSON.stringify({ error: String(err) });
       }
       chatMessages.push({

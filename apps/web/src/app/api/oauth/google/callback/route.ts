@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { exchangeCodeAndStore } from "@/server/calendar/client";
 import { z } from "zod";
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const error = searchParams.get("error");
 
   if (error) {
-    return NextResponse.redirect(new URL(`/dashboard/settings?error=google_denied`, request.url));
+    return NextResponse.redirect(new URL("/dashboard/settings?error=google_denied", request.url));
   }
 
   if (!code || !rawState) {
@@ -40,8 +40,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     await exchangeCodeAndStore(state.tenantId, code);
   } catch (err) {
     console.error("[oauth/google] exchange failed:", err);
-    return NextResponse.redirect(new URL(`/dashboard/settings?error=google_exchange`, request.url));
+    return NextResponse.redirect(new URL("/dashboard/settings?error=google_exchange", request.url));
   }
 
-  return NextResponse.redirect(new URL(`/dashboard/settings?success=google_connected`, request.url));
+  return NextResponse.redirect(new URL("/dashboard/settings?success=google_connected", request.url));
 }

@@ -30,9 +30,9 @@ const parseInitial = (raw: unknown): WorkingHours => {
     const d = obj[day];
     if (d) {
       result[day] = {
-        enabled: typeof d.enabled === "boolean" ? d.enabled : result[day]!.enabled,
-        open: typeof d.open === "string" ? d.open : result[day]!.open,
-        close: typeof d.close === "string" ? d.close : result[day]!.close,
+        enabled: typeof d.enabled === "boolean" ? d.enabled : result[day]?.enabled,
+        open: typeof d.open === "string" ? d.open : result[day]?.open,
+        close: typeof d.close === "string" ? d.close : result[day]?.close,
       };
     }
   }
@@ -49,10 +49,16 @@ export const WorkingHoursEditor = ({ initial, t }: Props) => {
   const [isPending, startTransition] = useTransition();
 
   const toggle = (day: DayKey) =>
-    setHours((prev) => ({ ...prev, [day]: { ...prev[day]!, enabled: !prev[day]!.enabled } }));
+    setHours((prev) => {
+      const d = prev[day] ?? DEFAULT_HOURS[day];
+      return { ...prev, [day]: { ...d, enabled: !d.enabled } };
+    });
 
   const setTime = (day: DayKey, field: "open" | "close", value: string) =>
-    setHours((prev) => ({ ...prev, [day]: { ...prev[day]!, [field]: value } }));
+    setHours((prev) => {
+      const d = prev[day] ?? DEFAULT_HOURS[day];
+      return { ...prev, [day]: { ...d, [field]: value } };
+    });
 
   const save = () => {
     startTransition(async () => {
@@ -64,7 +70,7 @@ export const WorkingHoursEditor = ({ initial, t }: Props) => {
     <div className="space-y-4">
       <div className="space-y-2">
         {DAYS.map((day) => {
-          const d = hours[day]!;
+          const d = hours[day] ?? DEFAULT_HOURS[day];
           return (
             <div key={day} className="flex items-center gap-3">
               <button
