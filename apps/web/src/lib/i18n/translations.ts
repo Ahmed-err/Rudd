@@ -11,6 +11,7 @@ export const translations = {
       conversations: "Conversations",
       appointments: "Appointments",
       settings: "Settings",
+      signOut: "Sign out",
     },
 
     home: {
@@ -45,6 +46,7 @@ export const translations = {
         send: "Send",
         sending: "Sending...",
         errorWaNotConnected: "WhatsApp not connected. Go to Settings → Integrations to connect.",
+        resolvedNote: "This conversation is resolved. Reopen it to send messages.",
       },
     },
 
@@ -57,9 +59,12 @@ export const translations = {
         dateTime: "Date & Time",
         status: "Status",
         calendar: "Calendar",
+        actions: "Actions",
       },
       synced: "Synced",
       notSynced: "Not synced",
+      cancel: "Cancel",
+      cancelling: "Cancelling...",
       status: { scheduled: "scheduled", completed: "completed", cancelled: "cancelled" },
     },
 
@@ -164,6 +169,7 @@ export const translations = {
       conversations: "المحادثات",
       appointments: "المواعيد",
       settings: "الإعدادات",
+      signOut: "تسجيل الخروج",
     },
 
     home: {
@@ -198,6 +204,7 @@ export const translations = {
         send: "إرسال",
         sending: "جار الإرسال...",
         errorWaNotConnected: "واتساب غير متصل. اذهب إلى الإعدادات ← التكاملات للاتصال.",
+        resolvedNote: "هذه المحادثة مغلقة. أعد فتحها لإرسال الرسائل.",
       },
     },
 
@@ -210,9 +217,12 @@ export const translations = {
         dateTime: "التاريخ والوقت",
         status: "الحالة",
         calendar: "التقويم",
+        actions: "إجراءات",
       },
       synced: "متزامن",
       notSynced: "غير متزامن",
+      cancel: "إلغاء",
+      cancelling: "جار الإلغاء...",
       status: { scheduled: "مجدول", completed: "مكتمل", cancelled: "ملغى" },
     },
 

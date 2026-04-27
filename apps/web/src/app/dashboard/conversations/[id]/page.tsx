@@ -102,9 +102,11 @@ export default async function ConversationDetailPage({
       {/* Reply box */}
       <ReplyBox
         conversationId={conversation.id}
+        status={conversation.status}
         placeholder={t.conversations.detail.replyPlaceholder}
         sendLabel={t.conversations.detail.send}
         sendingLabel={t.conversations.detail.sending}
+        resolvedNote={t.conversations.detail.resolvedNote}
       />
     </div>
   );

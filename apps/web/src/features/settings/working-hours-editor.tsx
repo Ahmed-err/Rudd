@@ -85,7 +85,7 @@ export const WorkingHoursEditor = ({ initial, t }: Props) => {
                 <span
                   className={cn(
                     "block w-4 h-4 bg-white rounded-full shadow transition-transform mx-1",
-                    d.enabled ? "translate-x-4" : "translate-x-0",
+                    d.enabled ? "ltr:translate-x-4 rtl:-translate-x-4" : "translate-x-0",
                   )}
                 />
               </button>

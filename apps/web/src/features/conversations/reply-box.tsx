@@ -6,12 +6,14 @@ import { sendManualReply } from "./reply-actions";
 
 type Props = {
   conversationId: string;
+  status: string;
   placeholder: string;
   sendLabel: string;
   sendingLabel: string;
+  resolvedNote: string;
 };
 
-export const ReplyBox = ({ conversationId, placeholder, sendLabel, sendingLabel }: Props) => {
+export const ReplyBox = ({ conversationId, status, placeholder, sendLabel, sendingLabel, resolvedNote }: Props) => {
   const [body, setBody] = useState("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
@@ -30,6 +32,14 @@ export const ReplyBox = ({ conversationId, placeholder, sendLabel, sendingLabel 
       }
     });
   };
+
+  if (status === "resolved") {
+    return (
+      <div className="border-t pt-3 shrink-0">
+        <p className="text-xs text-muted-foreground text-center py-2">{resolvedNote}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="border-t pt-3 shrink-0 space-y-2">
