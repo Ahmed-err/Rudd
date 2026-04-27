@@ -11,7 +11,7 @@ export type ConversationRow = {
   lastMessage: string | null;
 };
 
-export const listConversations = async (tenantId: string): Promise<ConversationRow[]> => {
+export const listConversations = async (tenantId: string, status?: string): Promise<ConversationRow[]> => {
   const rows = await db
     .select({
       id: conversations.id,
@@ -22,7 +22,11 @@ export const listConversations = async (tenantId: string): Promise<ConversationR
     })
     .from(conversations)
     .innerJoin(contacts, eq(conversations.contactId, contacts.id))
-    .where(eq(conversations.tenantId, tenantId))
+    .where(
+      status
+        ? and(eq(conversations.tenantId, tenantId), eq(conversations.status, status))
+        : eq(conversations.tenantId, tenantId),
+    )
     .orderBy(desc(conversations.lastMessageAt));
 
   const withLastMsg = await Promise.all(

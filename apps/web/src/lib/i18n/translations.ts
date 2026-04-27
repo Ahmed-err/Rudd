@@ -31,6 +31,7 @@ export const translations = {
     conversations: {
       title: "Conversations",
       empty: "No conversations yet.",
+      filter: { all: "All", active: "Active", resolved: "Resolved", escalated: "Escalated" },
       status: { active: "active", resolved: "resolved", escalated: "escalated" },
       detail: {
         back: "← Back",
@@ -189,6 +190,7 @@ export const translations = {
     conversations: {
       title: "المحادثات",
       empty: "لا توجد محادثات بعد.",
+      filter: { all: "الكل", active: "نشطة", resolved: "محلولة", escalated: "مُحوَّلة" },
       status: { active: "نشط", resolved: "محلول", escalated: "مُحوَّل" },
       detail: {
         back: "→ رجوع",

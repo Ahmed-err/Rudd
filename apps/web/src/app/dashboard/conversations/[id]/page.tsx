@@ -6,8 +6,8 @@ import { getConversationDetail } from "@/features/conversations/queries";
 import { StatusActions } from "@/features/conversations/status-actions";
 import { ReplyBox } from "@/features/conversations/reply-box";
 import { AutoRefresh } from "@/features/conversations/auto-refresh";
+import { MessageList } from "@/features/conversations/message-list";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 
 export default async function ConversationDetailPage({
   params,
@@ -60,43 +60,7 @@ export default async function ConversationDetailPage({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto py-4 space-y-3">
-        {messages.length === 0 ? (
-          <p className="text-muted-foreground text-sm text-center py-8">
-            {t.conversations.detail.noMessages}
-          </p>
-        ) : (
-          messages.map((msg) => {
-            const isOutbound = msg.direction === "outbound";
-            return (
-              <div
-                key={msg.id}
-                className={cn("flex", isOutbound ? "justify-end" : "justify-start")}
-              >
-                <div
-                  className={cn(
-                    "max-w-[75%] rounded-2xl px-4 py-2 text-sm",
-                    isOutbound
-                      ? "bg-primary text-primary-foreground rounded-br-sm"
-                      : "bg-muted rounded-bl-sm",
-                  )}
-                >
-                  {msg.body && <p className="whitespace-pre-wrap break-words">{msg.body}</p>}
-                  <p
-                    className={cn(
-                      "text-[10px] mt-1",
-                      isOutbound ? "text-primary-foreground/60 text-end" : "text-muted-foreground",
-                    )}
-                  >
-                    {new Date(msg.createdAt).toLocaleTimeString(t.locale, {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-              </div>
-            );
-          })
-        )}
+        <MessageList messages={messages} t={t.conversations.detail} />
       </div>
 
       {/* Reply box */}

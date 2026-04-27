@@ -5,10 +5,23 @@ import { listConversations } from "@/features/conversations/queries";
 import { AutoRefresh } from "@/features/conversations/auto-refresh";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
-export default async function ConversationsPage() {
-  const [{ tenantId }, t] = await Promise.all([getSessionTenant(), getT()]);
-  const conversations = await listConversations(tenantId);
+const FILTERS = ["all", "active", "escalated", "resolved"] as const;
+
+export default async function ConversationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const [{ tenantId }, t, { status }] = await Promise.all([
+    getSessionTenant(),
+    getT(),
+    searchParams,
+  ]);
+
+  const activeFilter = FILTERS.includes(status as typeof FILTERS[number]) ? status : "all";
+  const conversations = await listConversations(tenantId, activeFilter === "all" ? undefined : activeFilter);
 
   const statusColor: Record<string, string> = {
     active: "bg-green-100 text-green-800",
@@ -20,6 +33,24 @@ export default async function ConversationsPage() {
     <div className="space-y-4">
       <AutoRefresh intervalMs={10000} />
       <h1 className="text-2xl font-semibold">{t.conversations.title}</h1>
+
+      {/* Filter tabs */}
+      <div className="flex gap-1 flex-wrap">
+        {FILTERS.map((f) => (
+          <Link
+            key={f}
+            href={f === "all" ? "/dashboard/conversations" : `/dashboard/conversations?status=${f}`}
+            className={cn(
+              "px-3 py-1.5 rounded-md text-sm transition-colors",
+              activeFilter === f
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t.conversations.filter[f as keyof typeof t.conversations.filter]}
+          </Link>
+        ))}
+      </div>
 
       {conversations.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t.conversations.empty}</p>

@@ -50,6 +50,9 @@ type RunnerInput = {
   };
 };
 
+type DaySchedule = { enabled: boolean; open: string; close: string };
+const DAY_NAMES: Record<string, string> = { mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" };
+
 const buildSystemPrompt = (ctx: RunnerInput["context"]): string => {
   const services = Array.isArray(ctx.services) && ctx.services.length
     ? (ctx.services as Array<{ id: string; name: string; duration_minutes?: number }>)
@@ -57,11 +60,13 @@ const buildSystemPrompt = (ctx: RunnerInput["context"]): string => {
         .join("\n")
     : "• General appointment";
 
-  const hours = ctx.workingHours && typeof ctx.workingHours === "object"
-    ? Object.entries(ctx.workingHours as Record<string, string>)
-        .map(([day, range]) => `${day}: ${range}`)
-        .join(", ")
-    : "Mon–Fri 9am–5pm";
+  let hours = "Monday–Friday 09:00–17:00";
+  if (ctx.workingHours && typeof ctx.workingHours === "object") {
+    const entries = Object.entries(ctx.workingHours as Record<string, DaySchedule>)
+      .filter(([, v]) => v?.enabled)
+      .map(([k, v]) => `${DAY_NAMES[k] ?? k} ${v.open}–${v.close}`);
+    if (entries.length) hours = entries.join(", ");
+  }
 
   return `
 You are a professional booking assistant for **${ctx.businessName}** on WhatsApp.
@@ -71,6 +76,7 @@ SERVICES OFFERED:
 ${services}
 
 WORKING HOURS: ${hours}
+IMPORTANT: Never propose or book slots outside these working hours. If a customer requests a time outside working hours, politely inform them and offer the next available slot within working hours.
 
 YOUR GOAL: Guide the customer from their first message to a confirmed appointment in as few messages as possible.
 
