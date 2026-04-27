@@ -7,6 +7,7 @@ export const translations = {
 
     nav: {
       brand: "Rudd",
+      dashboard: "Dashboard",
       conversations: "Conversations",
       appointments: "Appointments",
       settings: "Settings",
@@ -16,6 +17,14 @@ export const translations = {
       tagline: "WhatsApp AI Appointment Agent",
       signIn: "Sign In",
       createAccount: "Create Account",
+    },
+
+    dashboard: {
+      title: "Dashboard",
+      activeConversations: "Active Conversations",
+      escalated: "Escalated",
+      upcomingAppointments: "Upcoming Appointments",
+      totalAppointments: "Total Appointments",
     },
 
     conversations: {
@@ -32,6 +41,10 @@ export const translations = {
         resolving: "Resolving...",
         escalating: "Escalating...",
         reopening: "Reopening...",
+        replyPlaceholder: "Type a message...",
+        send: "Send",
+        sending: "Sending...",
+        errorWaNotConnected: "WhatsApp not connected. Go to Settings → Integrations to connect.",
       },
     },
 
@@ -146,7 +159,8 @@ export const translations = {
     dir: "rtl" as const,
 
     nav: {
-      brand: "رود",
+      brand: "رد",
+      dashboard: "لوحة التحكم",
       conversations: "المحادثات",
       appointments: "المواعيد",
       settings: "الإعدادات",
@@ -156,6 +170,14 @@ export const translations = {
       tagline: "وكيل الذكاء الاصطناعي لحجز المواعيد عبر واتساب",
       signIn: "تسجيل الدخول",
       createAccount: "إنشاء حساب",
+    },
+
+    dashboard: {
+      title: "لوحة التحكم",
+      activeConversations: "المحادثات النشطة",
+      escalated: "المصعّدة",
+      upcomingAppointments: "المواعيد القادمة",
+      totalAppointments: "إجمالي المواعيد",
     },
 
     conversations: {
@@ -172,6 +194,10 @@ export const translations = {
         resolving: "جار الإغلاق...",
         escalating: "جار التصعيد...",
         reopening: "جار إعادة الفتح...",
+        replyPlaceholder: "اكتب رسالة...",
+        send: "إرسال",
+        sending: "جار الإرسال...",
+        errorWaNotConnected: "واتساب غير متصل. اذهب إلى الإعدادات ← التكاملات للاتصال.",
       },
     },
 

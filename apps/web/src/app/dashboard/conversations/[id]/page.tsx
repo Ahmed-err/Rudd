@@ -4,6 +4,8 @@ import { getSessionTenant } from "@/lib/session";
 import { getT } from "@/lib/i18n/server";
 import { getConversationDetail } from "@/features/conversations/queries";
 import { StatusActions } from "@/features/conversations/status-actions";
+import { ReplyBox } from "@/features/conversations/reply-box";
+import { AutoRefresh } from "@/features/conversations/auto-refresh";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +30,7 @@ export default async function ConversationDetailPage({
 
   return (
     <div className="flex flex-col h-[calc(100vh-3rem)] max-w-2xl mx-auto">
+      <AutoRefresh intervalMs={5000} />
       {/* Header */}
       <div className="flex items-center gap-3 pb-4 border-b shrink-0">
         <Link
@@ -95,6 +98,14 @@ export default async function ConversationDetailPage({
           })
         )}
       </div>
+
+      {/* Reply box */}
+      <ReplyBox
+        conversationId={conversation.id}
+        placeholder={t.conversations.detail.replyPlaceholder}
+        sendLabel={t.conversations.detail.send}
+        sendingLabel={t.conversations.detail.sending}
+      />
     </div>
   );
 }

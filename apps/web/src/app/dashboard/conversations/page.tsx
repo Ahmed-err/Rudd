@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSessionTenant } from "@/lib/session";
 import { getT } from "@/lib/i18n/server";
 import { listConversations } from "@/features/conversations/queries";
+import { AutoRefresh } from "@/features/conversations/auto-refresh";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -17,6 +18,7 @@ export default async function ConversationsPage() {
 
   return (
     <div className="space-y-4">
+      <AutoRefresh intervalMs={10000} />
       <h1 className="text-2xl font-semibold">{t.conversations.title}</h1>
 
       {conversations.length === 0 ? (

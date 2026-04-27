@@ -10,6 +10,7 @@ export const DashboardNav = ({ t, locale }: { t: T; locale: Locale }) => {
   const pathname = usePathname();
 
   const links = [
+    { href: "/dashboard", label: t.nav.dashboard },
     { href: "/dashboard/conversations", label: t.nav.conversations },
     { href: "/dashboard/appointments", label: t.nav.appointments },
     { href: "/dashboard/settings", label: t.nav.settings },
@@ -24,7 +25,7 @@ export const DashboardNav = ({ t, locale }: { t: T; locale: Locale }) => {
           href={l.href}
           className={cn(
             "rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-            pathname.startsWith(l.href) && "bg-accent text-accent-foreground font-medium",
+            (l.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(l.href)) && "bg-accent text-accent-foreground font-medium",
           )}
         >
           {l.label}
