@@ -9,6 +9,7 @@ export type AgentSettingsRow = {
   workingHours: unknown;
   services: unknown;
   systemPromptOverride: string | null;
+  notificationEmail: string | null;
 };
 
 export const getAgentSettings = async (tenantId: string): Promise<AgentSettingsRow | null> => {

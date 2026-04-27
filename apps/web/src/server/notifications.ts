@@ -5,12 +5,13 @@ type EscalationPayload = {
   contactWaId: string;
   conversationId: string;
   tenantName: string;
+  notificationEmail: string | null;
 };
 
 export const sendEscalationEmail = async (payload: EscalationPayload): Promise<void> => {
   const apiKey = process.env.RESEND_API_KEY;
-  const to = process.env.NOTIFICATION_EMAIL;
-  if (!apiKey || !to) return; // notifications are optional
+  const to = payload.notificationEmail; // each tenant sets their own email
+  if (!apiKey || !to) return;
 
   const displayName = payload.contactName ?? payload.contactWaId;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://your-app.vercel.app";

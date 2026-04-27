@@ -38,6 +38,17 @@ export const AgentSettingsForm = ({ settings, t }: Props) => {
       </div>
 
       <div className="space-y-1">
+        <Label htmlFor="notificationEmail">{t.notificationEmail}</Label>
+        <Input
+          id="notificationEmail"
+          name="notificationEmail"
+          type="email"
+          defaultValue={settings?.notificationEmail ?? ""}
+          placeholder={t.notificationEmailPlaceholder}
+        />
+      </div>
+
+      <div className="space-y-1">
         <Label htmlFor="systemPromptOverride">{t.instructions}</Label>
         <Textarea
           id="systemPromptOverride"

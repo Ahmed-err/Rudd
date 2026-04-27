@@ -11,6 +11,7 @@ const settingsSchema = z.object({
   businessName: z.string().min(1),
   timezone: z.string().min(1).default("UTC"),
   systemPromptOverride: z.string().optional(),
+  notificationEmail: z.string().email().optional().or(z.literal("")),
 });
 
 export const saveAgentSettings = async (formData: FormData): Promise<void> => {
@@ -20,6 +21,7 @@ export const saveAgentSettings = async (formData: FormData): Promise<void> => {
     businessName: formData.get("businessName"),
     timezone: formData.get("timezone"),
     systemPromptOverride: formData.get("systemPromptOverride") || undefined,
+    notificationEmail: formData.get("notificationEmail") || undefined,
   });
 
   if (!parsed.success) throw new Error("Invalid form data");
@@ -30,6 +32,7 @@ export const saveAgentSettings = async (formData: FormData): Promise<void> => {
       businessName: parsed.data.businessName,
       timezone: parsed.data.timezone,
       systemPromptOverride: parsed.data.systemPromptOverride ?? null,
+      notificationEmail: parsed.data.notificationEmail || null,
       updatedAt: new Date(),
     })
     .where(eq(agentSettings.tenantId, tenantId));

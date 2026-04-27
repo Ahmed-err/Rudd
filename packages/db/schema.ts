@@ -41,6 +41,7 @@ export const agentSettings = pgTable("agent_settings", {
   workingHours: jsonb("working_hours").notNull().default({}),
   services: jsonb("services").notNull().default([]),
   systemPromptOverride: text("system_prompt_override"),
+  notificationEmail: text("notification_email"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

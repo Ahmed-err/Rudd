@@ -1,7 +1,7 @@
 "use server";
 
 import { getSessionTenant } from "@/lib/session";
-import { db, conversations, contacts, tenants } from "@rudd/db";
+import { db, conversations, contacts, tenants, agentSettings } from "@rudd/db";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -27,10 +27,12 @@ export const setConversationStatus = async (
         contactName: contacts.name,
         contactWaId: contacts.waId,
         tenantName: tenants.name,
+        notificationEmail: agentSettings.notificationEmail,
       })
       .from(conversations)
       .innerJoin(contacts, eq(conversations.contactId, contacts.id))
       .innerJoin(tenants, eq(conversations.tenantId, tenants.id))
+      .leftJoin(agentSettings, eq(agentSettings.tenantId, tenants.id))
       .where(eq(conversations.id, conversationId))
       .limit(1);
 
@@ -40,6 +42,7 @@ export const setConversationStatus = async (
         contactWaId: row.contactWaId,
         conversationId,
         tenantName: row.tenantName,
+        notificationEmail: row.notificationEmail,
       });
     }
   }
