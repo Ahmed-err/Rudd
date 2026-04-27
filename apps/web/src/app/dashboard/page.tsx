@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getSessionTenant } from "@/lib/session";
 import { getT } from "@/lib/i18n/server";
 import { db, conversations, appointments } from "@rudd/db";
@@ -32,10 +33,13 @@ export default async function DashboardPage() {
     { label: t.dashboard.totalAppointments, value: totalAppts[0]?.count ?? 0, color: "text-foreground" },
   ];
 
+  const isNew = stats.every((s) => s.value === 0);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-2xl">
       <h1 className="text-2xl font-semibold">{t.dashboard.title}</h1>
-      <div className="grid grid-cols-2 gap-4 max-w-2xl">
+
+      <div className="grid grid-cols-2 gap-4">
         {stats.map((s) => (
           <Card key={s.label}>
             <CardHeader className="pb-2">
@@ -47,6 +51,24 @@ export default async function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {isNew && (
+        <Card className="border-dashed">
+          <CardHeader>
+            <CardTitle className="text-base">{t.dashboard.gettingStarted}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">{t.dashboard.emptyHint}</p>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/dashboard/settings?tab=integrations"
+                className="text-sm text-primary hover:underline">{t.nav.settings}</Link>
+              <span className="text-muted-foreground">·</span>
+              <Link href="/dashboard/conversations"
+                className="text-sm text-primary hover:underline">{t.nav.conversations}</Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

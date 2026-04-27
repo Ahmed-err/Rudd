@@ -9,6 +9,7 @@ export type ConversationRow = {
   contactName: string | null;
   contactWaId: string;
   lastMessage: string | null;
+  lastMessageDirection: string | null;
 };
 
 export const listConversations = async (tenantId: string, status?: string): Promise<ConversationRow[]> => {
@@ -33,14 +34,14 @@ export const listConversations = async (tenantId: string, status?: string): Prom
     rows.map(async (row) => {
       try {
         const [msg] = await db
-          .select({ body: messages.body })
+          .select({ body: messages.body, direction: messages.direction })
           .from(messages)
           .where(and(eq(messages.conversationId, row.id), eq(messages.tenantId, tenantId)))
           .orderBy(desc(messages.createdAt))
           .limit(1);
-        return { ...row, lastMessage: msg?.body ?? null };
+        return { ...row, lastMessage: msg?.body ?? null, lastMessageDirection: msg?.direction ?? null };
       } catch {
-        return { ...row, lastMessage: null };
+        return { ...row, lastMessage: null, lastMessageDirection: null };
       }
     }),
   );

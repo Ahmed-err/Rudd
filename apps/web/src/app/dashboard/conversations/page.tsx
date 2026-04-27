@@ -56,14 +56,19 @@ export default async function ConversationsPage({
         <p className="text-muted-foreground text-sm">{t.conversations.empty}</p>
       ) : (
         <div className="grid gap-3">
-          {conversations.map((c) => (
+          {conversations.map((c) => {
+            const hasUnread = c.lastMessageDirection === "inbound";
+            return (
             <Link key={c.id} href={`/dashboard/conversations/${c.id}`}>
-              <Card className="hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer">
+              <Card className={cn("hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer", hasUnread && "border-primary/40 bg-primary/5")}>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">
-                      {c.contactName ?? c.contactWaId}
-                    </CardTitle>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {hasUnread && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
+                      <CardTitle className={cn("text-base truncate", hasUnread && "font-bold")}>
+                        {c.contactName ?? c.contactWaId}
+                      </CardTitle>
+                    </div>
                     <Badge
                       className={statusColor[c.status] ?? "bg-gray-100 text-gray-800"}
                       variant="outline"
@@ -83,7 +88,8 @@ export default async function ConversationsPage({
                 )}
               </Card>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -16,6 +16,7 @@ export const DashboardNav = ({ t, locale }: { t: T; locale: Locale }) => {
   const links = [
     { href: "/dashboard", label: t.nav.dashboard },
     { href: "/dashboard/conversations", label: t.nav.conversations },
+    { href: "/dashboard/contacts", label: t.nav.contacts },
     { href: "/dashboard/appointments", label: t.nav.appointments },
     { href: "/dashboard/settings", label: t.nav.settings },
   ];

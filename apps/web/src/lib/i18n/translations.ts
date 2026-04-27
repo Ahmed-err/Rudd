@@ -10,6 +10,7 @@ export const translations = {
       dashboard: "Dashboard",
       conversations: "Conversations",
       appointments: "Appointments",
+      contacts: "Contacts",
       settings: "Settings",
       signOut: "Sign out",
     },
@@ -26,6 +27,9 @@ export const translations = {
       escalated: "Escalated",
       upcomingAppointments: "Upcoming Appointments",
       totalAppointments: "Total Appointments",
+      gettingStarted: "Getting Started",
+      emptyHint: "Send your WhatsApp number to a customer to start receiving messages. Conversations and appointments will appear here automatically.",
+      quickLinks: "Quick links",
     },
 
     conversations: {
@@ -43,6 +47,8 @@ export const translations = {
         resolving: "Resolving...",
         escalating: "Escalating...",
         reopening: "Reopening...",
+        today: "Today",
+        yesterday: "Yesterday",
         replyPlaceholder: "Type a message...",
         send: "Send",
         sending: "Sending...",
@@ -152,6 +158,19 @@ export const translations = {
       },
     },
 
+    contacts: {
+      title: "Contacts",
+      empty: "No contacts yet.",
+      columns: {
+        name: "Name",
+        phone: "Phone",
+        status: "Lead Status",
+        conversations: "Conversations",
+        lastSeen: "Last Seen",
+      },
+      viewConversations: "View",
+    },
+
     errors: {
       noTenant: "No tenant found for this organization.",
       tryAgain: "Try again",
@@ -169,6 +188,7 @@ export const translations = {
       dashboard: "لوحة التحكم",
       conversations: "المحادثات",
       appointments: "المواعيد",
+      contacts: "جهات الاتصال",
       settings: "الإعدادات",
       signOut: "تسجيل الخروج",
     },
@@ -185,6 +205,9 @@ export const translations = {
       escalated: "المصعّدة",
       upcomingAppointments: "المواعيد القادمة",
       totalAppointments: "إجمالي المواعيد",
+      gettingStarted: "ابدأ الآن",
+      emptyHint: "أرسل رقم واتساب الخاص بك إلى عميل لبدء تلقي الرسائل. ستظهر المحادثات والمواعيد هنا تلقائياً.",
+      quickLinks: "روابط سريعة",
     },
 
     conversations: {
@@ -202,6 +225,8 @@ export const translations = {
         resolving: "جار الإغلاق...",
         escalating: "جار التصعيد...",
         reopening: "جار إعادة الفتح...",
+        today: "اليوم",
+        yesterday: "أمس",
         replyPlaceholder: "اكتب رسالة...",
         send: "إرسال",
         sending: "جار الإرسال...",
@@ -309,6 +334,19 @@ export const translations = {
         finishing: "جار إكمال الإعداد...",
         error: "فشل الإعداد. يرجى المحاولة مجدداً.",
       },
+    },
+
+    contacts: {
+      title: "جهات الاتصال",
+      empty: "لا توجد جهات اتصال بعد.",
+      columns: {
+        name: "الاسم",
+        phone: "الهاتف",
+        status: "حالة العميل",
+        conversations: "المحادثات",
+        lastSeen: "آخر ظهور",
+      },
+      viewConversations: "عرض",
     },
 
     errors: {

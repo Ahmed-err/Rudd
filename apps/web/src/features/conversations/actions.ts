@@ -1,10 +1,11 @@
 "use server";
 
 import { getSessionTenant } from "@/lib/session";
-import { db, conversations } from "@rudd/db";
+import { db, conversations, contacts, tenants } from "@rudd/db";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { sendEscalationEmail } from "@/server/notifications";
 
 const statusSchema = z.enum(["active", "resolved", "escalated"]);
 
@@ -19,6 +20,29 @@ export const setConversationStatus = async (
     .update(conversations)
     .set({ status })
     .where(and(eq(conversations.id, conversationId), eq(conversations.tenantId, tenantId)));
+
+  if (status === "escalated") {
+    const [row] = await db
+      .select({
+        contactName: contacts.name,
+        contactWaId: contacts.waId,
+        tenantName: tenants.name,
+      })
+      .from(conversations)
+      .innerJoin(contacts, eq(conversations.contactId, contacts.id))
+      .innerJoin(tenants, eq(conversations.tenantId, tenants.id))
+      .where(eq(conversations.id, conversationId))
+      .limit(1);
+
+    if (row) {
+      await sendEscalationEmail({
+        contactName: row.contactName,
+        contactWaId: row.contactWaId,
+        conversationId,
+        tenantName: row.tenantName,
+      });
+    }
+  }
 
   revalidatePath(`/dashboard/conversations/${conversationId}`);
   revalidatePath("/dashboard/conversations");

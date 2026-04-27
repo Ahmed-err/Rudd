@@ -60,7 +60,7 @@ export default async function ConversationDetailPage({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto py-4 space-y-3">
-        <MessageList messages={messages} t={t.conversations.detail} />
+        <MessageList messages={messages} t={t.conversations.detail} locale={t.locale} />
       </div>
 
       {/* Reply box */}
