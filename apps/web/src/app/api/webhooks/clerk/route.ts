@@ -64,7 +64,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           tenantId: tenant.id,
           businessName: name,
           timezone: "UTC",
-          workingHours: { Mon: "9am-5pm", Tue: "9am-5pm", Wed: "9am-5pm", Thu: "9am-5pm", Fri: "9am-5pm" },
+          workingHours: {
+            mon: { enabled: true, open: "09:00", close: "17:00" },
+            tue: { enabled: true, open: "09:00", close: "17:00" },
+            wed: { enabled: true, open: "09:00", close: "17:00" },
+            thu: { enabled: true, open: "09:00", close: "17:00" },
+            fri: { enabled: true, open: "09:00", close: "17:00" },
+            sat: { enabled: false, open: "09:00", close: "17:00" },
+            sun: { enabled: false, open: "09:00", close: "17:00" },
+          },
           services: [],
         })
         .onConflictDoNothing({ target: agentSettings.tenantId });

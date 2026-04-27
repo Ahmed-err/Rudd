@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getSessionTenant } from "@/lib/session";
 import { getT } from "@/lib/i18n/server";
-import { listConversations } from "@/features/conversations/queries";
+import { listConversations, countConversations, PAGE_SIZE } from "@/features/conversations/queries";
 import { AutoRefresh } from "@/features/conversations/auto-refresh";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,20 +12,23 @@ const FILTERS = ["all", "active", "escalated", "resolved"] as const;
 export default async function ConversationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; waId?: string }>;
+  searchParams: Promise<{ status?: string; waId?: string; page?: string }>;
 }) {
-  const [{ tenantId }, t, { status, waId }] = await Promise.all([
+  const [{ tenantId }, t, { status, waId, page: pageParam }] = await Promise.all([
     getSessionTenant(),
     getT(),
     searchParams,
   ]);
 
   const activeFilter = FILTERS.includes(status as typeof FILTERS[number]) ? status : "all";
-  const conversations = await listConversations(
-    tenantId,
-    activeFilter === "all" ? undefined : activeFilter,
-    waId,
-  );
+  const statusFilter = activeFilter === "all" ? undefined : activeFilter;
+  const page = Math.max(0, Number(pageParam ?? 0));
+
+  const [conversations, total] = await Promise.all([
+    listConversations(tenantId, statusFilter, waId, page),
+    countConversations(tenantId, statusFilter, waId),
+  ]);
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const statusColor: Record<string, string> = {
     active: "bg-green-100 text-green-800",
@@ -64,7 +67,7 @@ export default async function ConversationsPage({
         ))}
       </div>
 
-      {conversations.length === 0 ? (
+      {conversations.length === 0 && page === 0 ? (
         <p className="text-muted-foreground text-sm">{t.conversations.empty}</p>
       ) : (
         <div className="grid gap-3">
@@ -102,6 +105,33 @@ export default async function ConversationsPage({
             </Link>
             );
           })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-xs text-muted-foreground">
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} / {total}
+          </p>
+          <div className="flex gap-2">
+            {page > 0 && (
+              <Link
+                href={{ query: { ...(status ? { status } : {}), ...(waId ? { waId } : {}), page: page - 1 } }}
+                className="px-3 py-1.5 rounded-md text-sm bg-muted hover:bg-accent transition-colors"
+              >
+                ←
+              </Link>
+            )}
+            {page + 1 < totalPages && (
+              <Link
+                href={{ query: { ...(status ? { status } : {}), ...(waId ? { waId } : {}), page: page + 1 } }}
+                className="px-3 py-1.5 rounded-md text-sm bg-muted hover:bg-accent transition-colors"
+              >
+                →
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </div>

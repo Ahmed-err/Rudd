@@ -1,6 +1,6 @@
 import "server-only";
 import { db, conversations, contacts, messages } from "@rudd/db";
-import { eq, desc, and, asc } from "drizzle-orm";
+import { eq, desc, and, asc, count } from "drizzle-orm";
 
 export type ConversationRow = {
   id: string;
@@ -12,10 +12,13 @@ export type ConversationRow = {
   lastMessageDirection: string | null;
 };
 
+export const PAGE_SIZE = 20;
+
 export const listConversations = async (
   tenantId: string,
   status?: string,
   waId?: string,
+  page = 0,
 ): Promise<ConversationRow[]> => {
   const conditions = [eq(conversations.tenantId, tenantId)];
   if (status) conditions.push(eq(conversations.status, status));
@@ -32,7 +35,9 @@ export const listConversations = async (
     .from(conversations)
     .innerJoin(contacts, eq(conversations.contactId, contacts.id))
     .where(and(...conditions))
-    .orderBy(desc(conversations.lastMessageAt));
+    .orderBy(desc(conversations.lastMessageAt))
+    .limit(PAGE_SIZE)
+    .offset(page * PAGE_SIZE);
 
   const withLastMsg = await Promise.all(
     rows.map(async (row) => {
@@ -51,6 +56,24 @@ export const listConversations = async (
   );
 
   return withLastMsg;
+};
+
+export const countConversations = async (
+  tenantId: string,
+  status?: string,
+  waId?: string,
+): Promise<number> => {
+  const conditions = [eq(conversations.tenantId, tenantId)];
+  if (status) conditions.push(eq(conversations.status, status));
+  if (waId) conditions.push(eq(contacts.waId, waId));
+
+  const [row] = await db
+    .select({ count: count() })
+    .from(conversations)
+    .innerJoin(contacts, eq(conversations.contactId, contacts.id))
+    .where(and(...conditions));
+
+  return row?.count ?? 0;
 };
 
 export type MessageRow = {
@@ -99,7 +122,8 @@ export const getConversationDetail = async (
     })
     .from(messages)
     .where(and(eq(messages.conversationId, conversationId), eq(messages.tenantId, tenantId)))
-    .orderBy(asc(messages.createdAt));
+    .orderBy(asc(messages.createdAt))
+    .limit(100);
 
   return { conversation: row, messages: msgs };
 };
