@@ -5,7 +5,9 @@ import { type NextFetchEvent, NextResponse, type NextRequest } from "next/server
 const CLERK_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 const isWebhookPath = (pathname: string) =>
-  pathname.startsWith("/api/webhook") || pathname.startsWith("/api/webhooks");
+  pathname.startsWith("/api/webhook") ||
+  pathname.startsWith("/api/webhooks") ||
+  pathname.startsWith("/api/inngest");
 
 export async function middleware(req: NextRequest, event: NextFetchEvent) {
   const { pathname } = req.nextUrl;
