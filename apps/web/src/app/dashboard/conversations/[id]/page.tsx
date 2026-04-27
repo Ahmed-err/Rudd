@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getSessionTenant } from "@/lib/session";
 import { getT } from "@/lib/i18n/server";
 import { getConversationDetail } from "@/features/conversations/queries";
+import { StatusActions } from "@/features/conversations/status-actions";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,11 @@ export default async function ConversationDetailPage({
         >
           {t.conversations.status[conversation.status as keyof typeof t.conversations.status] ?? conversation.status}
         </Badge>
+        <StatusActions
+          conversationId={conversation.id}
+          status={conversation.status}
+          t={t.conversations.detail}
+        />
       </div>
 
       {/* Messages */}
