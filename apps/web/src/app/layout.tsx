@@ -10,7 +10,14 @@ const notoArabic = Noto_Sans_Arabic({ subsets: ["arabic"], variable: "--font-ara
 
 export const metadata: Metadata = {
   title: "Rudd — WhatsApp AI Appointment Agent",
-  description: "Let AI handle your WhatsApp bookings and lead qualification.",
+  description: "Let AI handle your WhatsApp bookings and lead qualification. Automated appointment booking, customer follow-up, and escalation — all through WhatsApp.",
+  keywords: ["WhatsApp", "AI", "appointment booking", "chatbot", "business automation"],
+  openGraph: {
+    title: "Rudd — WhatsApp AI Appointment Agent",
+    description: "Automate your WhatsApp appointments with AI. Book, reschedule, and manage customer conversations without lifting a finger.",
+    type: "website",
+    url: process.env.NEXT_PUBLIC_APP_URL ?? "https://rudd-web.vercel.app",
+  },
   verification: {
     google: "0VD6NXatzINZ1sTog_Cj8ZlTYQwUcPeRHzPSWAy56gI",
   },
