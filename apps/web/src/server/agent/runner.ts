@@ -10,7 +10,7 @@ import { dispatchToolCall } from "./handlers";
 // Pattern: <function=name>{"arg":"val"}</function>  or  <function=name></function>
 const parseTextFunctionCalls = (content: string): Array<{ name: string; args: unknown }> => {
   const results: Array<{ name: string; args: unknown }> = [];
-  const re = /<function=([a-z_]+)>([\s\S]*?)<\/function>/g;
+  const re = /<function=([a-zA-Z_]+)>([\s\S]*?)<\/function>/g;
   for (let match = re.exec(content); match !== null; match = re.exec(content)) {
     const name = match[1] ?? "";
     const raw = match[2]?.trim();
@@ -82,10 +82,10 @@ YOUR GOAL: Guide the customer from their first message to a confirmed appointmen
 
 CONVERSATION FLOW:
 1. If this is the first message, greet warmly and ask which service they need (if not already stated).
-2. Once you know the service, immediately call propose_slots to offer 2–3 specific date/time options. Never ask open-ended "when are you free?".
-3. When the customer picks a slot, call book_appointment right away and confirm with the details.
-4. If they ask to cancel an existing appointment, call cancel_appointment.
-5. If the customer seems frustrated or the issue is outside your scope, call escalate_to_human.
+2. Once you know the service, immediately call proposeSlots to offer 2–3 specific date/time options. Never ask open-ended "when are you free?".
+3. When the customer picks a slot, call bookAppointment right away and confirm with the details.
+4. If they ask to cancel an existing appointment, call cancelAppointment.
+5. If the customer seems frustrated or the issue is outside your scope, call escalateToHuman.
 
 STRICT RULES:
 - Reply in the EXACT SAME LANGUAGE the customer uses. Arabic → Arabic, English → English. Never switch.

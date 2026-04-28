@@ -236,13 +236,13 @@ export const dispatchToolCall = async (
   ctx: HandlerContext,
 ): Promise<string> => {
   switch (name) {
-    case "list_services":        return handleListServices(args, ctx);
-    case "get_availability":     return handleGetAvailability(args, ctx);
-    case "propose_slots":        return handleProposeSlots(args, ctx);
-    case "book_appointment":     return handleBookAppointment(args, ctx);
-    case "cancel_appointment":   return handleCancelAppointment(args, ctx);
-    case "capture_lead":         return handleCaptureLead(args, ctx);
-    case "escalate_to_human":    return handleEscalateToHuman(args, ctx);
+    case "listServices":     return handleListServices(args, ctx);
+    case "getAvailability":  return handleGetAvailability(args, ctx);
+    case "proposeSlots":     return handleProposeSlots(args, ctx);
+    case "bookAppointment":  return handleBookAppointment(args, ctx);
+    case "cancelAppointment": return handleCancelAppointment(args, ctx);
+    case "captureLead":      return handleCaptureLead(args, ctx);
+    case "escalateToHuman":  return handleEscalateToHuman(args, ctx);
     default:
       return JSON.stringify({ error: `Unknown tool: ${name}` });
   }

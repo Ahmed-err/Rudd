@@ -72,7 +72,7 @@ export const TOOL_DEFINITIONS: OpenAI.Beta.Assistants.AssistantTool[] = [
   {
     type: "function",
     function: {
-      name: "list_services",
+      name: "listServices",
       description: "List all services offered by the business",
       parameters: { type: "object", properties: {}, required: [] },
     },
@@ -80,7 +80,7 @@ export const TOOL_DEFINITIONS: OpenAI.Beta.Assistants.AssistantTool[] = [
   {
     type: "function",
     function: {
-      name: "get_availability",
+      name: "getAvailability",
       description: "Check available time slots for a service within a date range",
       parameters: zodToJsonSchema(getAvailabilitySchema),
     },
@@ -88,7 +88,7 @@ export const TOOL_DEFINITIONS: OpenAI.Beta.Assistants.AssistantTool[] = [
   {
     type: "function",
     function: {
-      name: "propose_slots",
+      name: "proposeSlots",
       description: "Suggest a few specific appointment times for the contact to choose from",
       parameters: zodToJsonSchema(proposeSlotsSchema),
     },
@@ -96,7 +96,7 @@ export const TOOL_DEFINITIONS: OpenAI.Beta.Assistants.AssistantTool[] = [
   {
     type: "function",
     function: {
-      name: "book_appointment",
+      name: "bookAppointment",
       description: "Create an appointment and add it to the calendar",
       parameters: zodToJsonSchema(bookAppointmentSchema),
     },
@@ -104,7 +104,7 @@ export const TOOL_DEFINITIONS: OpenAI.Beta.Assistants.AssistantTool[] = [
   {
     type: "function",
     function: {
-      name: "cancel_appointment",
+      name: "cancelAppointment",
       description: "Cancel an existing appointment",
       parameters: zodToJsonSchema(cancelAppointmentSchema),
     },
@@ -112,7 +112,7 @@ export const TOOL_DEFINITIONS: OpenAI.Beta.Assistants.AssistantTool[] = [
   {
     type: "function",
     function: {
-      name: "capture_lead",
+      name: "captureLead",
       description: "Save contact information and qualification data",
       parameters: zodToJsonSchema(captureLeadSchema),
     },
@@ -120,7 +120,7 @@ export const TOOL_DEFINITIONS: OpenAI.Beta.Assistants.AssistantTool[] = [
   {
     type: "function",
     function: {
-      name: "escalate_to_human",
+      name: "escalateToHuman",
       description: "Hand off the conversation to a human agent",
       parameters: zodToJsonSchema(escalateToHumanSchema),
     },
