@@ -31,10 +31,13 @@ const client = new OpenAI({
     : "https://api.openai.com/v1",
 });
 
-const MODEL = process.env.GROQ_API_KEY ? "llama-3.3-70b-versatile" : "gpt-4o-mini";
+// llama-3.1-8b-instant: ~0.5s avg vs ~2s for 70b — fast enough for booking flows
+const MODEL = process.env.GROQ_API_KEY
+  ? (process.env.GROQ_MODEL ?? "llama-3.1-8b-instant")
+  : "gpt-4o-mini";
 
 const MAX_TOOL_ROUNDS = 4;
-const HISTORY_MESSAGES = 10;
+const HISTORY_MESSAGES = 6;
 
 type RunnerInput = {
   tenantId: string;
@@ -68,34 +71,14 @@ const buildSystemPrompt = (ctx: RunnerInput["context"]): string => {
     if (entries.length) hours = entries.join(", ");
   }
 
-  return `
-You are a professional booking assistant for **${ctx.businessName}** on WhatsApp.
-Today is ${new Date().toISOString().split("T")[0]}. Timezone: ${ctx.timezone}.
+  return `You are a booking assistant for ${ctx.businessName} on WhatsApp. Today: ${new Date().toISOString().split("T")[0]}. Timezone: ${ctx.timezone}.
 
-SERVICES OFFERED:
-${services}
+Services: ${services}
+Hours: ${hours} — never book outside these hours.
 
-WORKING HOURS: ${hours}
-IMPORTANT: Never propose or book slots outside these working hours. If a customer requests a time outside working hours, politely inform them and offer the next available slot within working hours.
+Flow: greet → ask service if unknown → call proposeSlots → customer picks → call bookAppointment → confirm. Call cancelAppointment for cancellations. Call escalateToHuman if frustrated or out of scope.
 
-YOUR GOAL: Guide the customer from their first message to a confirmed appointment in as few messages as possible.
-
-CONVERSATION FLOW:
-1. If this is the first message, greet warmly and ask which service they need (if not already stated).
-2. Once you know the service, immediately call proposeSlots to offer 2–3 specific date/time options. Never ask open-ended "when are you free?".
-3. When the customer picks a slot, call bookAppointment right away and confirm with the details.
-4. If they ask to cancel an existing appointment, call cancelAppointment.
-5. If the customer seems frustrated or the issue is outside your scope, call escalateToHuman.
-
-STRICT RULES:
-- Reply in the EXACT SAME LANGUAGE the customer uses. Arabic → Arabic, English → English. Never switch.
-- PLAIN TEXT ONLY. Zero markdown. No *, **, _, #, -, bullets, numbered lists, or colons introducing lists. Write in flowing sentences only.
-- WhatsApp style: short and warm. Maximum 3 sentences per reply.
-- Never say you are an AI or a bot unless the customer directly asks.
-- Never make up appointment times — always use propose_slots first.
-- Call only ONE tool per reply. Wait for the result before deciding the next step.
-${ctx.systemPrompt ? `\nOWNER INSTRUCTIONS (follow these above all):\n${ctx.systemPrompt}` : ""}
-`.trim();
+Rules: match customer language (Arabic→Arabic, English→English). Plain text only, no markdown. Max 3 short sentences. One tool call per turn.${ctx.systemPrompt ? `\nOwner instructions: ${ctx.systemPrompt}` : ""}`.trim();
 };
 
 export const runAssistant = async (input: RunnerInput): Promise<string> => {

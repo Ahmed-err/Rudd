@@ -32,8 +32,6 @@ export const handleIncomingMessage = inngest.createFunction(
     concurrency: { limit: 1, key: "event.data.from" },
   },
   async ({ event, step }) => {
-    console.log("[inngest] handle-incoming-message started", event.data);
-
     const {
       phoneNumberId,
       waMessageId,
@@ -42,11 +40,13 @@ export const handleIncomingMessage = inngest.createFunction(
       body,
     } = event.data as IncomingMessageEventData;
 
-    // ── 1. Resolve tenant ───────────────────────────────────────────────────
-    const ctx = await step.run("load-context", async () => {
+    // ── Step 1: resolve tenant + upsert contact/conversation + persist inbound ──
+    // Merged into one step to minimise Inngest round-trips and DB cold-start cost.
+    const ctx = await step.run("setup", async () => {
       const [waAccount] = await db
         .select({
           tenantId: waAccounts.tenantId,
+          encryptedAccessToken: waAccounts.encryptedAccessToken,
           businessName: agentSettings.businessName,
           systemPrompt: agentSettings.systemPromptOverride,
           services: agentSettings.services,
@@ -60,58 +60,58 @@ export const handleIncomingMessage = inngest.createFunction(
         .limit(1);
 
       if (!waAccount) throw new Error(`No tenant found for phoneNumberId=${phoneNumberId}`);
-      return waAccount;
-    });
 
-    // ── 2. Upsert contact (atomic — unique index on tenantId+waId) ────────────
-    const contactId = await step.run("upsert-contact", async () => {
-      const [row] = await db
+      const [contactRow] = await db
         .insert(contacts)
-        .values({ tenantId: ctx.tenantId, waId: from, name: contactName })
+        .values({ tenantId: waAccount.tenantId, waId: from, name: contactName })
         .onConflictDoUpdate({
           target: [contacts.tenantId, contacts.waId],
           set: { name: contactName ?? contacts.name },
         })
         .returning({ id: contacts.id });
-      if (!row) throw new Error("Failed to upsert contact");
-      return row.id;
-    });
+      if (!contactRow) throw new Error("Failed to upsert contact");
 
-    // ── 3. Upsert conversation (atomic — unique index on tenantId+contactId) ──
-    const conversationId = await step.run("upsert-conversation", async () => {
-      const [row] = await db
+      const [convRow] = await db
         .insert(conversations)
-        .values({ tenantId: ctx.tenantId, contactId, lastMessageAt: new Date() })
+        .values({ tenantId: waAccount.tenantId, contactId: contactRow.id, lastMessageAt: new Date() })
         .onConflictDoUpdate({
           target: [conversations.tenantId, conversations.contactId],
           set: { lastMessageAt: new Date() },
         })
         .returning({ id: conversations.id });
-      if (!row) throw new Error("Failed to upsert conversation");
-      return row.id;
-    });
+      if (!convRow) throw new Error("Failed to upsert conversation");
 
-    // ── 4. Persist inbound message (idempotent on waMessageId) ─────────────
-    await step.run("persist-inbound", async () => {
       await db
         .insert(messages)
         .values({
-          tenantId: ctx.tenantId,
-          conversationId,
+          tenantId: waAccount.tenantId,
+          conversationId: convRow.id,
           waMessageId,
           direction: "inbound",
           role: "user",
           body,
         })
         .onConflictDoNothing({ target: messages.waMessageId });
+
+      return {
+        tenantId: waAccount.tenantId,
+        contactId: contactRow.id,
+        conversationId: convRow.id,
+        encryptedAccessToken: waAccount.encryptedAccessToken,
+        businessName: waAccount.businessName,
+        systemPrompt: waAccount.systemPrompt,
+        services: waAccount.services,
+        workingHours: waAccount.workingHours,
+        timezone: waAccount.timezone,
+      };
     });
 
-    // ── 5. Run the assistant ────────────────────────────────────────────────
+    // ── Step 2: run AI assistant ────────────────────────────────────────────
     const reply = await step.run("run-assistant", () =>
       runAssistant({
         tenantId: ctx.tenantId,
-        conversationId,
-        contactId,
+        conversationId: ctx.conversationId,
+        contactId: ctx.contactId,
         userMessage: body,
         context: {
           businessName: ctx.businessName ?? "this business",
@@ -123,37 +123,23 @@ export const handleIncomingMessage = inngest.createFunction(
       }),
     );
 
-    // ── 6. Send WhatsApp reply ───────────────────────────────────────────────
-    await step.run("send-reply", async () => {
-      const [waAcct] = await db
-        .select({ encryptedAccessToken: waAccounts.encryptedAccessToken })
-        .from(waAccounts)
-        .where(eq(waAccounts.phoneNumberId, phoneNumberId))
-        .limit(1);
-      if (!waAcct) throw new Error(`WA account missing for phoneNumberId=${phoneNumberId}`);
-      const accessToken = await decrypt(waAcct.encryptedAccessToken);
-      return sendWhatsAppMessage({ to: from, body: reply, phoneNumberId, accessToken });
-    });
+    // ── Step 3: send reply + persist outbound (WA send + DB writes in parallel) ──
+    await step.run("send-and-persist", async () => {
+      const accessToken = await decrypt(ctx.encryptedAccessToken);
+      const now = new Date();
 
-    // ── 7. Persist outbound + update conversation ───────────────────────────
-    await step.run("persist-outbound", async () => {
-      await db.insert(messages).values({
-        tenantId: ctx.tenantId,
-        conversationId,
-        direction: "outbound",
-        role: "assistant",
-        body: reply,
-      });
-
-      await db
-        .update(conversations)
-        .set({ lastMessageAt: new Date() })
-        .where(eq(conversations.id, conversationId));
-
-      await db
-        .update(webhookEvents)
-        .set({ processedAt: new Date() })
-        .where(eq(webhookEvents.waMessageId, waMessageId));
+      await Promise.all([
+        sendWhatsAppMessage({ to: from, body: reply, phoneNumberId, accessToken }),
+        db.insert(messages).values({
+          tenantId: ctx.tenantId,
+          conversationId: ctx.conversationId,
+          direction: "outbound",
+          role: "assistant",
+          body: reply,
+        }),
+        db.update(conversations).set({ lastMessageAt: now }).where(eq(conversations.id, ctx.conversationId)),
+        db.update(webhookEvents).set({ processedAt: now }).where(eq(webhookEvents.waMessageId, waMessageId)),
+      ]);
     });
 
     return { ok: true, reply };
