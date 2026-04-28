@@ -4,6 +4,7 @@ import { getT } from "@/lib/i18n/server";
 import { db, conversations, appointments } from "@rudd/db";
 import { eq, and, gte, count } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AutoRefresh } from "@/features/conversations/auto-refresh";
 
 export default async function DashboardPage() {
   const [{ tenantId }, t] = await Promise.all([getSessionTenant(), getT()]);
@@ -37,6 +38,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
+      <AutoRefresh intervalMs={30000} />
       <h1 className="text-2xl font-semibold">{t.dashboard.title}</h1>
 
       <div className="grid grid-cols-2 gap-4">

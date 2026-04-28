@@ -1,6 +1,8 @@
 import "server-only";
 import { db, appointments, contacts } from "@rudd/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, count } from "drizzle-orm";
+
+export const APPOINTMENTS_PAGE_SIZE = 20;
 
 export type AppointmentRow = {
   id: string;
@@ -14,7 +16,7 @@ export type AppointmentRow = {
   gcalEventId: string | null;
 };
 
-export const listAppointments = async (tenantId: string): Promise<AppointmentRow[]> =>
+export const listAppointments = async (tenantId: string, page = 0): Promise<AppointmentRow[]> =>
   db
     .select({
       id: appointments.id,
@@ -30,4 +32,14 @@ export const listAppointments = async (tenantId: string): Promise<AppointmentRow
     .from(appointments)
     .innerJoin(contacts, eq(appointments.contactId, contacts.id))
     .where(eq(appointments.tenantId, tenantId))
-    .orderBy(desc(appointments.startAt));
+    .orderBy(desc(appointments.startAt))
+    .limit(APPOINTMENTS_PAGE_SIZE)
+    .offset(page * APPOINTMENTS_PAGE_SIZE);
+
+export const countAppointments = async (tenantId: string): Promise<number> => {
+  const [row] = await db
+    .select({ count: count() })
+    .from(appointments)
+    .where(eq(appointments.tenantId, tenantId));
+  return row?.count ?? 0;
+};

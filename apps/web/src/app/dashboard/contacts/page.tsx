@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getSessionTenant } from "@/lib/session";
 import { getT } from "@/lib/i18n/server";
-import { listContacts } from "@/features/contacts/queries";
+import { listContacts, countContacts, CONTACTS_PAGE_SIZE } from "@/features/contacts/queries";
+import { Pagination } from "@/components/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,9 +13,21 @@ const leadStatusColor: Record<string, string> = {
   unqualified: "bg-gray-100 text-gray-800",
 };
 
-export default async function ContactsPage() {
-  const [{ tenantId }, t] = await Promise.all([getSessionTenant(), getT()]);
-  const contacts = await listContacts(tenantId);
+export default async function ContactsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const [{ tenantId }, t, { page: pageParam }] = await Promise.all([
+    getSessionTenant(),
+    getT(),
+    searchParams,
+  ]);
+  const page = Math.max(0, Number(pageParam ?? 0));
+  const [contacts, total] = await Promise.all([
+    listContacts(tenantId, page),
+    countContacts(tenantId),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -23,6 +36,7 @@ export default async function ContactsPage() {
       {contacts.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t.contacts.empty}</p>
       ) : (
+        <>
         <div className="rounded-md border">
           <Table className="table-fixed w-full">
             <TableHeader>
@@ -64,6 +78,8 @@ export default async function ContactsPage() {
             </TableBody>
           </Table>
         </div>
+        <Pagination page={page} total={total} pageSize={CONTACTS_PAGE_SIZE} searchParams={{}} />
+        </>
       )}
     </div>
   );

@@ -1,13 +1,26 @@
 import { getSessionTenant } from "@/lib/session";
 import { getT } from "@/lib/i18n/server";
-import { listAppointments } from "@/features/appointments/queries";
+import { listAppointments, countAppointments, APPOINTMENTS_PAGE_SIZE } from "@/features/appointments/queries";
 import { CancelButton } from "@/features/appointments/cancel-button";
+import { Pagination } from "@/components/pagination";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export default async function AppointmentsPage() {
-  const [{ tenantId }, t] = await Promise.all([getSessionTenant(), getT()]);
-  const appts = await listAppointments(tenantId);
+export default async function AppointmentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const [{ tenantId }, t, { page: pageParam }] = await Promise.all([
+    getSessionTenant(),
+    getT(),
+    searchParams,
+  ]);
+  const page = Math.max(0, Number(pageParam ?? 0));
+  const [appts, total] = await Promise.all([
+    listAppointments(tenantId, page),
+    countAppointments(tenantId),
+  ]);
 
   const statusColor: Record<string, string> = {
     scheduled: "bg-blue-100 text-blue-800",
@@ -64,6 +77,7 @@ export default async function AppointmentsPage() {
               ))}
             </TableBody>
           </Table>
+        <Pagination page={page} total={total} pageSize={APPOINTMENTS_PAGE_SIZE} searchParams={{}} />
         </div>
       )}
     </div>

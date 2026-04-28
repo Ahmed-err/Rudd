@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { sendManualReply } from "./reply-actions";
 
@@ -18,6 +19,7 @@ export const ReplyBox = ({ conversationId, status, placeholder, sendLabel, sendi
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const router = useRouter();
 
   const send = () => {
     if (!body.trim()) return;
@@ -27,6 +29,7 @@ export const ReplyBox = ({ conversationId, status, placeholder, sendLabel, sendi
         await sendManualReply(conversationId, body);
         setBody("");
         textareaRef.current?.focus();
+        router.refresh(); // immediately re-fetch messages so MessageList scrolls to bottom
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to send");
       }

@@ -3,6 +3,7 @@ import { getSessionTenant } from "@/lib/session";
 import { getT } from "@/lib/i18n/server";
 import { listConversations, countConversations, PAGE_SIZE } from "@/features/conversations/queries";
 import { AutoRefresh } from "@/features/conversations/auto-refresh";
+import { Pagination } from "@/components/pagination";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -28,7 +29,6 @@ export default async function ConversationsPage({
     listConversations(tenantId, statusFilter, waId, page),
     countConversations(tenantId, statusFilter, waId),
   ]);
-  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const statusColor: Record<string, string> = {
     active: "bg-green-100 text-green-800",
@@ -108,32 +108,12 @@ export default async function ConversationsPage({
         </div>
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-muted-foreground">
-            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} / {total}
-          </p>
-          <div className="flex gap-2">
-            {page > 0 && (
-              <Link
-                href={{ query: { ...(status ? { status } : {}), ...(waId ? { waId } : {}), page: page - 1 } }}
-                className="px-3 py-1.5 rounded-md text-sm bg-muted hover:bg-accent transition-colors"
-              >
-                ←
-              </Link>
-            )}
-            {page + 1 < totalPages && (
-              <Link
-                href={{ query: { ...(status ? { status } : {}), ...(waId ? { waId } : {}), page: page + 1 } }}
-                className="px-3 py-1.5 rounded-md text-sm bg-muted hover:bg-accent transition-colors"
-              >
-                →
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        total={total}
+        pageSize={PAGE_SIZE}
+        searchParams={{ status: activeFilter !== "all" ? activeFilter : undefined, waId }}
+      />
     </div>
   );
 }
