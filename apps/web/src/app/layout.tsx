@@ -11,6 +11,9 @@ const notoArabic = Noto_Sans_Arabic({ subsets: ["arabic"], variable: "--font-ara
 export const metadata: Metadata = {
   title: "Rudd — WhatsApp AI Appointment Agent",
   description: "Let AI handle your WhatsApp bookings and lead qualification.",
+  verification: {
+    google: "0VD6NXatzINZ1sTog_Cj8ZlTYQwUcPeRHzPSWAy56gI",
+  },
 };
 
 const RootLayout = async ({ children }: { children: ReactNode }) => {
