@@ -4,8 +4,8 @@ export const metadata = {
 
 export default function PrivacyPage() {
   const updated = "April 28, 2026";
-  const contact = "privacy@sarmadax.com"; // update to your real email
-  const appUrl = "https://ruuudd-web.vercel.app";
+  const contact = "hello@sarmadax.com";
+  const appUrl = "https://rudd-web.vercel.app";
 
   return (
     <main className="max-w-3xl mx-auto px-6 py-12 prose prose-neutral">
