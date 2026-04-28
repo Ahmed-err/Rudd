@@ -24,7 +24,7 @@ export const waAccounts = pgTable("wa_accounts", {
 // ── Google Accounts ────────────────────────────────────────────────────────────
 export const googleAccounts = pgTable("google_accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
-  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }).unique(),
   encryptedRefreshToken: text("encrypted_refresh_token").notNull(),
   calendarId: text("calendar_id").notNull().default("primary"),
   scopes: text("scopes").array().notNull(),

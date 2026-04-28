@@ -39,8 +39,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     await exchangeCodeAndStore(state.tenantId, code);
   } catch (err) {
-    console.error("[oauth/google] exchange failed:", err);
-    return NextResponse.redirect(new URL("/dashboard/settings?error=google_exchange", request.url));
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[oauth/google] exchange failed:", msg);
+    return NextResponse.redirect(
+      new URL(`/dashboard/settings?error=${encodeURIComponent(msg)}`, request.url),
+    );
   }
 
   return NextResponse.redirect(new URL("/dashboard/settings?success=google_connected", request.url));

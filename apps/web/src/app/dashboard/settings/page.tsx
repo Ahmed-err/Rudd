@@ -38,7 +38,7 @@ export default async function SettingsPage({
       )}
       {error && (
         <div className="rounded-md bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-800">
-          {error === "google_denied" ? t.settings.integrations.errorDenied : t.settings.integrations.errorGeneric}
+          {error === "google_denied" ? t.settings.integrations.errorDenied : error === "google_exchange" ? t.settings.integrations.errorGeneric : (decodeURIComponent(error) || t.settings.integrations.errorGeneric)}
         </div>
       )}
 
