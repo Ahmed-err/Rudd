@@ -44,29 +44,34 @@ export const escalateToHumanSchema = z.object({
 
 // ── OpenAI tool definitions ────────────────────────────────────────────────────
 
-const zodToJsonSchema = (schema: z.ZodObject<z.ZodRawShape>) =>
-  // Use the Zod schema directly — OpenAI accepts JSON Schema objects
-  // This is a minimal hand-rolled converter for flat object schemas
-  ({
-    type: "object" as const,
-    properties: Object.fromEntries(
-      Object.entries(schema.shape).map(([key, val]) => {
-        const def = (val as z.ZodTypeAny)._def;
-        const base: Record<string, unknown> = {};
-        if (def.description) base.description = def.description;
-        if (def.typeName === "ZodString") base.type = "string";
-        else if (def.typeName === "ZodNumber") base.type = "number";
-        else if (def.typeName === "ZodBoolean") base.type = "boolean";
-        else if (def.typeName === "ZodRecord") base.type = "object";
-        else base.type = "string";
-        return [key, base];
-      }),
-    ),
-    required: Object.keys(schema.shape).filter((k) => {
-      const field = schema.shape[k] as z.ZodTypeAny;
-      return !(field instanceof z.ZodOptional) && !(field instanceof z.ZodDefault);
+// Unwrap ZodOptional / ZodDefault to get the inner type name
+const unwrap = (val: z.ZodTypeAny): z.ZodTypeAny => {
+  const name = val._def.typeName;
+  if (name === "ZodOptional" || name === "ZodDefault") return unwrap(val._def.innerType);
+  return val;
+};
+
+const zodToJsonSchema = (schema: z.ZodObject<z.ZodRawShape>) => ({
+  type: "object" as const,
+  properties: Object.fromEntries(
+    Object.entries(schema.shape).map(([key, val]) => {
+      const inner = unwrap(val as z.ZodTypeAny);
+      const typeName = inner._def.typeName;
+      const base: Record<string, unknown> = {};
+      if ((val as z.ZodTypeAny)._def.description) base.description = (val as z.ZodTypeAny)._def.description;
+      if (typeName === "ZodString") base.type = "string";
+      else if (typeName === "ZodNumber") base.type = "number";
+      else if (typeName === "ZodBoolean") base.type = "boolean";
+      else if (typeName === "ZodRecord") base.type = "object";
+      else base.type = "string";
+      return [key, base];
     }),
-  });
+  ),
+  required: Object.keys(schema.shape).filter((k) => {
+    const field = schema.shape[k] as z.ZodTypeAny;
+    return !(field instanceof z.ZodOptional) && !(field instanceof z.ZodDefault);
+  }),
+});
 
 export const TOOL_DEFINITIONS: OpenAI.Beta.Assistants.AssistantTool[] = [
   {
