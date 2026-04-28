@@ -22,6 +22,9 @@ const HomePage = async () => {
         <Link href="/sign-in"><Button>{t.home.signIn}</Button></Link>
         <Link href="/sign-up"><Button variant="outline">{t.home.createAccount}</Button></Link>
       </div>
+      <Link href="/privacy" className="text-xs text-muted-foreground hover:underline mt-4">
+        Privacy Policy
+      </Link>
     </main>
   );
 };

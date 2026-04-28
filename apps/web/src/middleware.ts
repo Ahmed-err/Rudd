@@ -21,7 +21,7 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
   }
 
   const { clerkMiddleware, createRouteMatcher } = await import("@clerk/nextjs/server");
-  const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/sign-up(.*)", "/onboarding(.*)" ]);
+  const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/sign-up(.*)", "/onboarding(.*)", "/privacy" ]);
 
   return clerkMiddleware(async (auth, request) => {
     if (!isPublicRoute(request)) {
