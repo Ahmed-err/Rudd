@@ -36,8 +36,9 @@ const MODEL = process.env.GROQ_API_KEY
   ? (process.env.GROQ_MODEL ?? "llama-3.1-8b-instant")
   : "gpt-4o-mini";
 
-const MAX_TOOL_ROUNDS = 4;
+const MAX_TOOL_ROUNDS = 3;
 const HISTORY_MESSAGES = 6;
+const LLM_TIMEOUT_MS = 8_000;
 
 type RunnerInput = {
   tenantId: string;
@@ -111,14 +112,17 @@ export const runAssistant = async (input: RunnerInput): Promise<string> => {
   ];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const response = await client.chat.completions.create({
-      model: MODEL,
-      messages: chatMessages,
-      tools: TOOL_DEFINITIONS as OpenAI.Chat.ChatCompletionTool[],
-      tool_choice: "auto",
-      // Prevent the model calling multiple tools at once — keeps flow predictable
-      parallel_tool_calls: false,
-    });
+    const response = await client.chat.completions.create(
+      {
+        model: MODEL,
+        messages: chatMessages,
+        tools: TOOL_DEFINITIONS as OpenAI.Chat.ChatCompletionTool[],
+        tool_choice: "auto",
+        // Prevent the model calling multiple tools at once — keeps flow predictable
+        parallel_tool_calls: false,
+      },
+      { timeout: LLM_TIMEOUT_MS },
+    );
 
     const choice = response.choices[0];
     if (!choice) throw new Error("No response from model");
@@ -190,13 +194,16 @@ export const runAssistant = async (input: RunnerInput): Promise<string> => {
   }
 
   // Exceeded rounds — ask the model for a plain text reply with no tools
-  const fallback = await client.chat.completions.create({
-    model: MODEL,
-    messages: [
-      ...chatMessages,
-      { role: "system", content: "Summarise what you know and give a SHORT plain text reply. No tool calls." },
-    ],
-  });
+  const fallback = await client.chat.completions.create(
+    {
+      model: MODEL,
+      messages: [
+        ...chatMessages,
+        { role: "system", content: "Summarise what you know and give a SHORT plain text reply. No tool calls." },
+      ],
+    },
+    { timeout: LLM_TIMEOUT_MS },
+  );
 
   return stripMarkdown(fallback.choices[0]?.message.content ?? "")
     || "Sorry, I ran into an issue. Please try again.";

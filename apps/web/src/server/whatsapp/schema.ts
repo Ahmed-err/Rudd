@@ -10,7 +10,7 @@ export const waTextMessageSchema = z.object({
   contacts: z
     .array(
       z.object({
-        profile: z.object({ name: z.string() }),
+        profile: z.object({ name: z.string().optional() }).optional(),
         wa_id: z.string(),
       }),
     )
@@ -26,11 +26,12 @@ export const waTextMessageSchema = z.object({
       }),
     )
     .optional(),
+  // Use z.string() (not enum) so unknown statuses Meta adds in future don't fail the whole payload.
   statuses: z
     .array(
       z.object({
         id: z.string(),
-        status: z.enum(["sent", "delivered", "read", "failed"]),
+        status: z.string(),
         timestamp: z.string(),
         recipient_id: z.string(),
       }),

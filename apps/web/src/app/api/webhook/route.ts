@@ -3,6 +3,7 @@ import { inngest } from "@/server/inngest/client";
 import { waWebhookPayloadSchema } from "@/server/whatsapp/schema";
 import { verifyWhatsAppSignature } from "@/server/whatsapp/verify";
 import { rateLimit } from "@/lib/rate-limit";
+import { db, webhookEvents } from "@rudd/db";
 import { NextResponse, type NextRequest } from "next/server";
 
 // GET — Meta webhook verification handshake
@@ -20,7 +21,6 @@ export const GET = (req: NextRequest): NextResponse => {
 };
 
 // POST — inbound messages from Meta
-// Returns 200 immediately; all heavy work runs in after() so Meta never times out.
 export const POST = async (req: NextRequest): Promise<NextResponse> => {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!rateLimit(`wa:${ip}`, 60, 60_000)) {
@@ -72,7 +72,7 @@ export const POST = async (req: NextRequest): Promise<NextResponse> => {
             phoneNumberId: metadata.phone_number_id,
             waMessageId: msg.id,
             from: msg.from,
-            contactName: contact?.profile.name,
+            contactName: contact?.profile?.name,
             body: msg.text.body,
             timestamp: msg.timestamp,
           },
@@ -85,12 +85,23 @@ export const POST = async (req: NextRequest): Promise<NextResponse> => {
 
   if (events.length > 0) {
     console.log("[webhook] enqueuing to Inngest:", events.map(e => `${e.id} from=${e.data.from}`));
-
-    // Fire-and-forget — 200 is already on its way to Meta, Inngest runs in background
-    inngest
-      .send(events as Parameters<typeof inngest.send>[0])
-      .then((r) => console.log("[webhook] inngest.send() ok:", JSON.stringify(r)))
-      .catch((err) => console.error("[webhook] inngest.send() FAILED:", err));
+    try {
+      // Persist raw payload + enqueue in parallel. Both idempotent (unique on waMessageId,
+      // Inngest dedupes by event id), so a Meta retry can't duplicate either.
+      await Promise.all([
+        inngest.send(events as Parameters<typeof inngest.send>[0]),
+        db
+          .insert(webhookEvents)
+          .values(events.map(e => ({
+            waMessageId: e.id,
+            payload: json as Record<string, unknown>,
+          })))
+          .onConflictDoNothing({ target: webhookEvents.waMessageId }),
+      ]);
+    } catch (err) {
+      console.error("[webhook] enqueue/persist FAILED:", err);
+      return NextResponse.json({ error: "Enqueue failed" }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ received: true }, { status: 200 });

@@ -30,6 +30,9 @@ export const handleIncomingMessage = inngest.createFunction(
     triggers: [{ event: "wa/message.received" }],
     retries: 3,
     concurrency: { limit: 1, key: "event.data.from" },
+    // Hard cap so a stuck run can't block the per-user concurrency queue forever.
+    // 45s covers worst-case: cold Neon (1s) + 3-round LLM (24s) + WA send (8s) + slack.
+    timeouts: { finish: "45s" },
   },
   async ({ event, step }) => {
     const {
@@ -40,9 +43,11 @@ export const handleIncomingMessage = inngest.createFunction(
       body,
     } = event.data as IncomingMessageEventData;
 
-    // ── Step 1: resolve tenant + upsert contact/conversation + persist inbound ──
-    // Merged into one step to minimise Inngest round-trips and DB cold-start cost.
-    const ctx = await step.run("setup", async () => {
+    // Single step — Inngest step boundaries cost ~500ms each on hobby tier.
+    // Trade-off: on transient failure the LLM call is repeated. Acceptable because
+    // (a) failures are rare and (b) Meta will redeliver anyway, so a "preserved"
+    // LLM result wouldn't help if WA send dies permanently.
+    const result = await step.run("process-message", async () => {
       const [waAccount] = await db
         .select({
           tenantId: waAccounts.tenantId,
@@ -81,7 +86,8 @@ export const handleIncomingMessage = inngest.createFunction(
         .returning({ id: conversations.id });
       if (!convRow) throw new Error("Failed to upsert conversation");
 
-      await db
+      // Idempotency: returning is empty when the row already existed → Meta retry, bail.
+      const inserted = await db
         .insert(messages)
         .values({
           tenantId: waAccount.tenantId,
@@ -91,57 +97,46 @@ export const handleIncomingMessage = inngest.createFunction(
           role: "user",
           body,
         })
-        .onConflictDoNothing({ target: messages.waMessageId });
+        .onConflictDoNothing({ target: messages.waMessageId })
+        .returning({ id: messages.id });
+      if (!inserted.length) {
+        console.log(`[inngest] duplicate webhook for waMessageId=${waMessageId} — skipping`);
+        return { ok: true, duplicate: true };
+      }
 
-      return {
+      const reply = await runAssistant({
         tenantId: waAccount.tenantId,
-        contactId: contactRow.id,
         conversationId: convRow.id,
-        encryptedAccessToken: waAccount.encryptedAccessToken,
-        businessName: waAccount.businessName,
-        systemPrompt: waAccount.systemPrompt,
-        services: waAccount.services,
-        workingHours: waAccount.workingHours,
-        timezone: waAccount.timezone,
-      };
-    });
-
-    // ── Step 2: run AI assistant ────────────────────────────────────────────
-    const reply = await step.run("run-assistant", () =>
-      runAssistant({
-        tenantId: ctx.tenantId,
-        conversationId: ctx.conversationId,
-        contactId: ctx.contactId,
+        contactId: contactRow.id,
         userMessage: body,
         context: {
-          businessName: ctx.businessName ?? "this business",
-          services: ctx.services ?? [],
-          workingHours: ctx.workingHours,
-          timezone: ctx.timezone ?? "UTC",
-          systemPrompt: ctx.systemPrompt ?? undefined,
+          businessName: waAccount.businessName ?? "this business",
+          services: waAccount.services ?? [],
+          workingHours: waAccount.workingHours,
+          timezone: waAccount.timezone ?? "UTC",
+          systemPrompt: waAccount.systemPrompt ?? undefined,
         },
-      }),
-    );
+      });
 
-    // ── Step 3: send reply + persist outbound (WA send + DB writes in parallel) ──
-    await step.run("send-and-persist", async () => {
-      const accessToken = await decrypt(ctx.encryptedAccessToken);
+      const accessToken = await decrypt(waAccount.encryptedAccessToken);
       const now = new Date();
 
       await Promise.all([
         sendWhatsAppMessage({ to: from, body: reply, phoneNumberId, accessToken }),
         db.insert(messages).values({
-          tenantId: ctx.tenantId,
-          conversationId: ctx.conversationId,
+          tenantId: waAccount.tenantId,
+          conversationId: convRow.id,
           direction: "outbound",
           role: "assistant",
           body: reply,
         }),
-        db.update(conversations).set({ lastMessageAt: now }).where(eq(conversations.id, ctx.conversationId)),
-        db.update(webhookEvents).set({ processedAt: now }).where(eq(webhookEvents.waMessageId, waMessageId)),
+        db.update(conversations).set({ lastMessageAt: now }).where(eq(conversations.id, convRow.id)),
+        db.update(webhookEvents).set({ processedAt: now, tenantId: waAccount.tenantId }).where(eq(webhookEvents.waMessageId, waMessageId)),
       ]);
+
+      return { ok: true, reply };
     });
 
-    return { ok: true, reply };
+    return result;
   },
 );
