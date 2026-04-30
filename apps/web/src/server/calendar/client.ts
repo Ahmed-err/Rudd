@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { decrypt, encrypt } from "@/server/crypto";
 import { env } from "@/lib/env";
 
+const GCAL_TIMEOUT_MS = 8_000;
+
 // ── Token management ───────────────────────────────────────────────────────────
 
 type TokenSet = {
@@ -22,6 +24,7 @@ const refreshAccessToken = async (refreshToken: string): Promise<string> => {
       refresh_token: refreshToken,
       grant_type: "refresh_token",
     }),
+    signal: AbortSignal.timeout(GCAL_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -88,6 +91,7 @@ export const exchangeCodeAndStore = async (
       code,
       grant_type: "authorization_code",
     }),
+    signal: AbortSignal.timeout(GCAL_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -134,6 +138,7 @@ export const getFreeBusy = async (
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ timeMin, timeMax, items: [{ id: calendarId }] }),
+    signal: AbortSignal.timeout(GCAL_TIMEOUT_MS),
   });
 
   if (!res.ok) throw new Error(`FreeBusy query failed: ${await res.text()}`);
@@ -180,6 +185,7 @@ export const createCalendarEvent = async (
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(GCAL_TIMEOUT_MS),
     },
   );
 
@@ -203,6 +209,7 @@ export const deleteCalendarEvent = async (
     {
       method: "DELETE",
       headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(GCAL_TIMEOUT_MS),
     },
   );
 

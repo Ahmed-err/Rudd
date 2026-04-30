@@ -31,14 +31,16 @@ const client = new OpenAI({
     : "https://api.openai.com/v1",
 });
 
-// llama-3.1-8b-instant: ~0.5s avg vs ~2s for 70b — fast enough for booking flows
+// gpt-oss-120b: 120B-param open model, strong reasoning + tool calls, ~1-2s on Groq.
+// Override via GROQ_MODEL env var (e.g. qwen/qwen3-32b for Arabic, llama-3.1-8b-instant for speed).
 const MODEL = process.env.GROQ_API_KEY
-  ? (process.env.GROQ_MODEL ?? "llama-3.1-8b-instant")
+  ? (process.env.GROQ_MODEL ?? "openai/gpt-oss-120b")
   : "gpt-4o-mini";
 
 const MAX_TOOL_ROUNDS = 3;
 const HISTORY_MESSAGES = 6;
-const LLM_TIMEOUT_MS = 8_000;
+const LLM_TIMEOUT_MS = 12_000;
+const TEMPERATURE = 0.5;
 
 type RunnerInput = {
   tenantId: string;
@@ -60,9 +62,9 @@ const DAY_NAMES: Record<string, string> = { mon: "Monday", tue: "Tuesday", wed: 
 const buildSystemPrompt = (ctx: RunnerInput["context"]): string => {
   const services = Array.isArray(ctx.services) && ctx.services.length
     ? (ctx.services as Array<{ id: string; name: string; duration_minutes?: number }>)
-        .map(s => `• ${s.name}${s.duration_minutes ? ` (${s.duration_minutes} min)` : ""}`)
+        .map(s => `- ${s.name}${s.duration_minutes ? ` (${s.duration_minutes} min)` : ""} [service_id: ${s.id}]`)
         .join("\n")
-    : "• General appointment";
+    : "- General appointment [service_id: general]";
 
   let hours = "Monday–Friday 09:00–17:00";
   if (ctx.workingHours && typeof ctx.workingHours === "object") {
@@ -72,14 +74,33 @@ const buildSystemPrompt = (ctx: RunnerInput["context"]): string => {
     if (entries.length) hours = entries.join(", ");
   }
 
-  return `You are a booking assistant for ${ctx.businessName} on WhatsApp. Today: ${new Date().toISOString().split("T")[0]}. Timezone: ${ctx.timezone}.
+  return `You are the booking assistant for ${ctx.businessName} on WhatsApp. Today is ${new Date().toISOString().split("T")[0]}. Timezone: ${ctx.timezone}.
 
-Services: ${services}
-Hours: ${hours} — never book outside these hours.
+Services:
+${services}
 
-Flow: greet → ask service if unknown → call proposeSlots → customer picks → call bookAppointment → confirm. Call cancelAppointment for cancellations. Call escalateToHuman if frustrated or out of scope.
+Hours: ${hours}. Never book outside these hours.
 
-Rules: match customer language (Arabic→Arabic, English→English). Plain text only, no markdown. Max 3 short sentences. One tool call per turn.${ctx.systemPrompt ? `\nOwner instructions: ${ctx.systemPrompt}` : ""}`.trim();
+Voice: warm, friendly, professional — like a thoughtful receptionist texting back. Sound human, not scripted.
+
+Language: mirror the customer exactly.
+- If they write Arabic, reply in Arabic. Match their dialect: Egyptian (إزيك، تمام، حضرتك), Gulf (شلونك، زين), Levantine (كيفك، منيح), or MSA. Never mix English words into Arabic replies. Use natural phrasing, not literal translations.
+- If they write English, reply in English.
+- If unsure, default to the language of their last message.
+
+Format: plain text only. No markdown, no bullet points, no emojis (unless the customer used them first). Keep it short — usually 1–2 sentences. Don't repeat yourself across turns.
+
+Flow:
+1. Greet warmly on first contact and ask how you can help.
+2. If the service isn't clear, ask — don't list everything unless they request it.
+3. When they're ready to schedule, call proposeSlots with their preferred date range.
+4. After they pick a slot, call bookAppointment, then confirm with the date/time in plain language.
+5. Use cancelAppointment for cancellations.
+6. Use escalateToHuman if they're frustrated, the request is off-scope, or you're stuck.
+
+One tool call per turn. Never narrate or mention the tool call (or service_ids, date formats, etc.) to the customer — just take the action and reply naturally.
+
+When calling proposeSlots/bookAppointment, always pass the exact [service_id: ...] shown above for the chosen service. Use YYYY-MM-DD for dates and ISO 8601 for datetimes.${ctx.systemPrompt ? `\n\nOwner instructions: ${ctx.systemPrompt}` : ""}`.trim();
 };
 
 export const runAssistant = async (input: RunnerInput): Promise<string> => {
@@ -118,6 +139,7 @@ export const runAssistant = async (input: RunnerInput): Promise<string> => {
         messages: chatMessages,
         tools: TOOL_DEFINITIONS as OpenAI.Chat.ChatCompletionTool[],
         tool_choice: "auto",
+        temperature: TEMPERATURE,
         // Prevent the model calling multiple tools at once — keeps flow predictable
         parallel_tool_calls: false,
       },
@@ -199,8 +221,9 @@ export const runAssistant = async (input: RunnerInput): Promise<string> => {
       model: MODEL,
       messages: [
         ...chatMessages,
-        { role: "system", content: "Summarise what you know and give a SHORT plain text reply. No tool calls." },
+        { role: "system", content: "Summarise what you know and give a SHORT plain text reply in the customer's language. No tool calls." },
       ],
+      temperature: TEMPERATURE,
     },
     { timeout: LLM_TIMEOUT_MS },
   );
