@@ -42,6 +42,11 @@ const cryptoSchema = z.object({
   ENCRYPTION_KEY: z.string().length(64, "ENCRYPTION_KEY must be a 64-char hex string (32 bytes)"),
 });
 
+const leadHunterSchema = z.object({
+  API_KEY: z.string().min(32, "LEADHUNTER_API_KEY must be at least 32 characters"),
+  TENANT_ID: z.string().uuid(),
+});
+
 const makeGroup = <T extends z.ZodRawShape>(schema: z.ZodObject<T>, label: string) => {
   let cached: z.infer<typeof schema> | null = null;
   return new Proxy({} as z.infer<typeof schema>, {
@@ -70,4 +75,5 @@ export const env = {
   db: makeGroup(dbSchema, "db"),
   inngest: makeGroup(inngestSchema, "inngest"),
   crypto: makeGroup(cryptoSchema, "crypto"),
+  leadHunter: makeGroup(leadHunterSchema, "leadHunter"),
 };
