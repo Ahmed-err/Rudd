@@ -19,7 +19,7 @@ export const POST = async (req: NextRequest): Promise<NextResponse> => {
     // 1. Authenticate LeadHunter
     const authorization = req.headers.get("authorization");
 
-    if (authorization !== `Bearer ${env.leadHunter.API_KEY}`) {
+    if (authorization !== `Bearer ${env.leadHunter.LEADHUNTER_API_KEY}`) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 },
@@ -52,7 +52,7 @@ export const POST = async (req: NextRequest): Promise<NextResponse> => {
 
     const { name, phone, message, leadData } = parsed.data;
 
-    const tenantId = env.leadHunter.TENANT_ID;
+    const tenantId = env.leadHunter.LEADHUNTER_TENANT_ID;
 
     // 3. Get the WhatsApp account for this tenant
     const [waAccount] = await db

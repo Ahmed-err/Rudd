@@ -43,8 +43,11 @@ const cryptoSchema = z.object({
 });
 
 const leadHunterSchema = z.object({
-  API_KEY: z.string().min(32, "LEADHUNTER_API_KEY must be at least 32 characters"),
-  TENANT_ID: z.string().uuid(),
+  LEADHUNTER_API_KEY: z
+    .string()
+    .min(32, "LEADHUNTER_API_KEY must be at least 32 characters"),
+
+  LEADHUNTER_TENANT_ID: z.string().uuid(),
 });
 
 const makeGroup = <T extends z.ZodRawShape>(schema: z.ZodObject<T>, label: string) => {
