@@ -7,7 +7,8 @@ const CLERK_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const isWebhookPath = (pathname: string) =>
   pathname.startsWith("/api/webhook") ||
   pathname.startsWith("/api/webhooks") ||
-  pathname.startsWith("/api/inngest");
+  pathname.startsWith("/api/inngest") ||
+  pathname.startsWith("/api/outbound");
 
 export async function middleware(req: NextRequest, event: NextFetchEvent) {
   const { pathname } = req.nextUrl;
