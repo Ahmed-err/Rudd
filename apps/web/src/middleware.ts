@@ -22,7 +22,16 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
   }
 
   const { clerkMiddleware, createRouteMatcher } = await import("@clerk/nextjs/server");
-  const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/sign-up(.*)", "/onboarding(.*)", "/privacy" ]);
+  const isPublicRoute = createRouteMatcher([
+    "/",
+    "/sign-in(.*)",
+    "/sign-up(.*)",
+    "/onboarding(.*)",
+    "/privacy",
+    // Search engines fetch these signed out; behind auth.protect() they were 404.
+    "/robots.txt",
+    "/sitemap.xml",
+  ]);
 
   return clerkMiddleware(async (auth, request) => {
     if (!isPublicRoute(request)) {
