@@ -3,7 +3,7 @@
 ## Stack
 - **Next.js 15** (App Router, RSC) · **TypeScript strict** · **pnpm** workspaces
 - **Drizzle + Neon Postgres** · **Clerk** (auth + orgs) · **Inngest** (async) · **shadcn/ui + Tailwind**
-- **OpenAI Assistants API** (threads + function calling) · **Meta WhatsApp Cloud API** (direct)
+- **Groq / OpenAI Chat Completions** (function calling, via the `openai` SDK) · **Meta WhatsApp Cloud API** (direct)
 
 ## Code Style
 - Arrow functions everywhere; no `function` declarations except for `async function` Next.js route handlers where required.
@@ -27,10 +27,10 @@
 - Never use `setTimeout` or polling loops inside Next.js route handlers.
 
 ## Security Rules
-- Verify `X-Hub-Signature-256` on every POST to `/api/webhooks/whatsapp` using timing-safe comparison.
+- Verify `X-Hub-Signature-256` on every POST to `/api/webhook` (the WhatsApp webhook) using timing-safe comparison.
 - Verify Clerk webhook signature on every POST to `/api/webhooks/clerk`.
 - Google + WhatsApp access/refresh tokens are stored AES-GCM encrypted using `ENCRYPTION_KEY`; use `server/crypto.ts`.
-- Validate all env vars at startup via `lib/env.ts` (Zod). App must crash early if required vars are missing.
+- Validate all env vars via `lib/env.ts` (Zod). `instrumentation.ts` calls `validateEnvAtStartup()` so production crashes early if required vars are missing.
 - Never log tokens, secrets, or PII.
 
 ## Directory Map
@@ -56,4 +56,6 @@ pnpm dev              # start Next.js dev server
 pnpm test             # run vitest
 pnpm typecheck        # tsc --noEmit across all packages
 pnpm lint             # biome lint
+pnpm --filter @rudd/db generate   # create a migration after editing schema.ts
+pnpm --filter @rudd/db migrate    # apply migrations (needs DATABASE_URL)
 ```

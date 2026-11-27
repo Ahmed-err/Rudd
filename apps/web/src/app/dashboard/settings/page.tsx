@@ -6,6 +6,7 @@ import { ServicesEditor } from "@/features/settings/services-editor";
 import { WorkingHoursEditor } from "@/features/settings/working-hours-editor";
 import { WhatsAppSetup } from "@/features/settings/whatsapp-setup";
 import { Button } from "@/components/ui/button";
+import { parseServices } from "@rudd/shared";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -23,9 +24,7 @@ export default async function SettingsPage({
     getWhatsAppAccount(tenantId),
   ]);
 
-  const services = Array.isArray(settings?.services)
-    ? (settings.services as Array<{ id: string; name: string; duration_minutes: number }>)
-    : [];
+  const services = parseServices(settings?.services);
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -38,7 +37,7 @@ export default async function SettingsPage({
       )}
       {error && (
         <div className="rounded-md bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-800">
-          {error === "google_denied" ? t.settings.integrations.errorDenied : error === "google_exchange" ? t.settings.integrations.errorGeneric : (decodeURIComponent(error) || t.settings.integrations.errorGeneric)}
+          {error === "google_denied" ? t.settings.integrations.errorDenied : t.settings.integrations.errorGeneric}
         </div>
       )}
 

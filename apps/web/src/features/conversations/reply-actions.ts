@@ -2,12 +2,12 @@
 
 import { getSessionTenant } from "@/lib/session";
 import { getT } from "@/lib/i18n/server";
-import { db, conversations, contacts, messages, waAccounts } from "@rudd/db";
+import { db, conversations, contacts, messages, waAccounts, withTenant } from "@rudd/db";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { decrypt } from "@/server/crypto";
-import { sendWhatsAppMessage } from "@/server/whatsapp/client";
+import { isOutsideServiceWindowError, sendWhatsAppMessage } from "@/server/whatsapp/client";
 
 export const sendManualReply = async (conversationId: string, body: string): Promise<void> => {
   z.string().uuid().parse(conversationId);
@@ -15,45 +15,45 @@ export const sendManualReply = async (conversationId: string, body: string): Pro
 
   const [{ tenantId }, t] = await Promise.all([getSessionTenant(), getT()]);
 
-  const [conv] = await db
-    .select({ contactId: conversations.contactId })
-    .from(conversations)
-    .where(and(eq(conversations.id, conversationId), eq(conversations.tenantId, tenantId)))
-    .limit(1);
-
-  if (!conv) throw new Error("Conversation not found");
-
-  const [contact] = await db
+  const [row] = await db
     .select({ waId: contacts.waId })
-    .from(contacts)
-    .where(and(eq(contacts.id, conv.contactId), eq(contacts.tenantId, tenantId)))
+    .from(conversations)
+    .innerJoin(contacts, eq(contacts.id, conversations.contactId))
+    .where(and(withTenant(tenantId, conversations.tenantId), eq(conversations.id, conversationId)))
     .limit(1);
-
-  if (!contact) throw new Error("Contact not found");
+  if (!row) throw new Error("Conversation not found");
 
   const [waAcct] = await db
     .select({ phoneNumberId: waAccounts.phoneNumberId, encryptedAccessToken: waAccounts.encryptedAccessToken })
     .from(waAccounts)
-    .where(eq(waAccounts.tenantId, tenantId))
+    .where(withTenant(tenantId, waAccounts.tenantId))
     .limit(1);
-
   if (!waAcct) throw new Error(t.conversations.detail.errorWaNotConnected);
 
   const accessToken = await decrypt(waAcct.encryptedAccessToken);
-  await sendWhatsAppMessage({ to: contact.waId, body: text, phoneNumberId: waAcct.phoneNumberId, accessToken });
+  let sentId: string | null = null;
+  try {
+    const sent = await sendWhatsAppMessage({ to: row.waId, body: text, phoneNumberId: waAcct.phoneNumberId, accessToken });
+    sentId = sent.messages[0]?.id ?? null;
+  } catch (err) {
+    if (isOutsideServiceWindowError(err)) throw new Error(t.conversations.detail.errorOutsideWindow);
+    throw err;
+  }
 
   await db.insert(messages).values({
     tenantId,
     conversationId,
+    waMessageId: sentId,
     direction: "outbound",
     role: "assistant",
     body: text,
   });
 
+  // A human replying takes over the chat so the AI doesn't talk over them.
   await db
     .update(conversations)
-    .set({ lastMessageAt: new Date() })
-    .where(eq(conversations.id, conversationId));
+    .set({ lastMessageAt: new Date(), aiPaused: true })
+    .where(and(withTenant(tenantId, conversations.tenantId), eq(conversations.id, conversationId)));
 
   revalidatePath(`/dashboard/conversations/${conversationId}`);
 };

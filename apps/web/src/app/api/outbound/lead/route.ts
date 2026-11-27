@@ -1,212 +1,165 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { env } from "@/lib/env";
-import { db, contacts, conversations, messages, waAccounts } from "@rudd/db";
+import { db, contacts, conversations, messages, waAccounts, withTenant } from "@rudd/db";
 import { decrypt } from "@/server/crypto";
-import { sendWhatsAppMessage } from "@/server/whatsapp/client";
+import { safeEqual } from "@/server/safe-equal";
+import { normalizePhone } from "@/server/whatsapp/phone";
+import {
+  isOutsideServiceWindowError,
+  sendWhatsAppMessage,
+  sendWhatsAppTemplate,
+  WhatsAppApiError,
+} from "@/server/whatsapp/client";
 
-const leadSchema = z.object({
-  name: z.string().min(1).max(200),
-  phone: z.string().min(8).max(32),
-  message: z.string().min(1).max(4096),
-  leadData: z.record(z.string(), z.unknown()).optional(),
-});
+const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+const leadSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    phone: z.string().min(8).max(32),
+    // Free text: only deliverable inside the 24h customer-service window.
+    message: z.string().min(1).max(4096).optional(),
+    // Approved template: required to open a conversation with a cold lead.
+    template: z
+      .object({
+        name: z.string().min(1).max(512),
+        language: z.string().min(2).max(15).default("en"),
+        components: z.array(z.unknown()).optional(),
+      })
+      .optional(),
+    leadData: z.record(z.string(), z.unknown()).optional(),
+  })
+  .refine((v) => v.message || v.template, { message: "Provide `message` or `template`" });
+
+const error = (status: number, code: string, extra: Record<string, unknown> = {}): NextResponse =>
+  NextResponse.json({ error: code, ...extra }, { status });
 
 export const POST = async (req: NextRequest): Promise<NextResponse> => {
+  const authorization = req.headers.get("authorization") ?? "";
+  if (!safeEqual(authorization, `Bearer ${env.leadHunter.LEADHUNTER_API_KEY}`)) {
+    return error(401, "unauthorized");
+  }
+
+  let body: unknown;
   try {
-    // 1. Authenticate LeadHunter
-    const authorization = req.headers.get("authorization");
+    body = await req.json();
+  } catch {
+    return error(400, "invalid_json");
+  }
 
-    if (authorization !== `Bearer ${env.leadHunter.LEADHUNTER_API_KEY}`) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+  const parsed = leadSchema.safeParse(body);
+  if (!parsed.success) return error(400, "invalid_request", { details: parsed.error.flatten() });
 
-    // 2. Parse request body
-    let body: unknown;
+  const { name, message, template, leadData } = parsed.data;
+  const waId = normalizePhone(parsed.data.phone);
+  if (!waId) return error(400, "invalid_phone", { hint: "Use international format, e.g. +201001234567" });
 
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid JSON" },
-        { status: 400 },
-      );
-    }
+  const tenantId = env.leadHunter.LEADHUNTER_TENANT_ID;
 
-    const parsed = leadSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          error: "Invalid request",
-          details: parsed.error.flatten(),
-        },
-        { status: 400 },
-      );
-    }
-
-    const { name, phone, message, leadData } = parsed.data;
-
-    const tenantId = env.leadHunter.LEADHUNTER_TENANT_ID;
-
-    // 3. Get the WhatsApp account for this tenant
+  try {
     const [waAccount] = await db
-      .select({
-        phoneNumberId: waAccounts.phoneNumberId,
-        encryptedAccessToken: waAccounts.encryptedAccessToken,
-      })
+      .select({ phoneNumberId: waAccounts.phoneNumberId, encryptedAccessToken: waAccounts.encryptedAccessToken })
       .from(waAccounts)
-      .where(eq(waAccounts.tenantId, tenantId))
+      .where(withTenant(tenantId, waAccounts.tenantId))
       .limit(1);
+    if (!waAccount) return error(404, "whatsapp_not_connected");
 
-    if (!waAccount) {
-      return NextResponse.json(
-        { error: "WhatsApp account not connected" },
-        { status: 404 },
-      );
-    }
-
-    // 4. Find or create the contact
-    const [existingContact] = await db
-      .select({
-        id: contacts.id,
-        qualificationData: contacts.qualificationData,
-      })
+    const [existing] = await db
+      .select({ qualificationData: contacts.qualificationData })
       .from(contacts)
-      .where(
-        and(
-          eq(contacts.tenantId, tenantId),
-          eq(contacts.waId, phone),
-        ),
-      )
+      .where(and(withTenant(tenantId, contacts.tenantId), eq(contacts.waId, waId)))
       .limit(1);
 
-    let contactId: string;
+    const qualificationData = {
+      ...((existing?.qualificationData as Record<string, unknown> | undefined) ?? {}),
+      ...(leadData ?? {}),
+      source: "leadhunter",
+    };
 
-    if (existingContact) {
-      contactId = existingContact.id;
-
-      await db
-        .update(contacts)
-        .set({
-          name,
-          qualificationData: {
-            ...(existingContact.qualificationData as Record<string, unknown>),
-            ...(leadData ?? {}),
-            source: "leadhunter",
-          },
-          updatedAt: new Date(),
-        })
-        .where(eq(contacts.id, contactId));
-    } else {
-      const [newContact] = await db
-        .insert(contacts)
-        .values({
-          tenantId,
-          waId: phone,
-          name,
-          leadStatus: "new",
-          qualificationData: {
-            ...(leadData ?? {}),
-            source: "leadhunter",
-          },
-        })
-        .returning({
-          id: contacts.id,
-        });
-
-      if (!newContact) {
-        throw new Error("Failed to create contact");
-      }
-
-      contactId = newContact.id;
-    }
-
-    // 5. Find or create conversation
-    const [existingConversation] = await db
-      .select({
-        id: conversations.id,
+    const [contact] = await db
+      .insert(contacts)
+      .values({ tenantId, waId, name, leadStatus: "new", qualificationData })
+      .onConflictDoUpdate({
+        target: [contacts.tenantId, contacts.waId],
+        set: { name, qualificationData, updatedAt: new Date() },
       })
-      .from(conversations)
+      .returning({ id: contacts.id });
+    if (!contact) throw new Error("Failed to upsert contact");
+
+    const [conversation] = await db
+      .insert(conversations)
+      .values({ tenantId, contactId: contact.id, lastMessageAt: new Date() })
+      .onConflictDoUpdate({
+        target: [conversations.tenantId, conversations.contactId],
+        set: { lastMessageAt: new Date() },
+      })
+      .returning({ id: conversations.id });
+    if (!conversation) throw new Error("Failed to upsert conversation");
+
+    const [lastInbound] = await db
+      .select({ createdAt: messages.createdAt })
+      .from(messages)
       .where(
         and(
-          eq(conversations.tenantId, tenantId),
-          eq(conversations.contactId, contactId),
+          withTenant(tenantId, messages.tenantId),
+          eq(messages.conversationId, conversation.id),
+          eq(messages.direction, "inbound"),
         ),
       )
+      .orderBy(desc(messages.createdAt))
       .limit(1);
+    const windowOpen = !!lastInbound && Date.now() - lastInbound.createdAt.getTime() < SERVICE_WINDOW_MS;
 
-    let conversationId: string;
-
-    if (existingConversation) {
-      conversationId = existingConversation.id;
-    } else {
-      const [newConversation] = await db
-        .insert(conversations)
-        .values({
-          tenantId,
-          contactId,
-          lastMessageAt: new Date(),
-        })
-        .returning({
-          id: conversations.id,
-        });
-
-      if (!newConversation) {
-        throw new Error("Failed to create conversation");
-      }
-
-      conversationId = newConversation.id;
+    if (!template && !windowOpen) {
+      return error(422, "template_required", {
+        hint: "This contact has not messaged in the last 24 hours; WhatsApp only allows approved templates.",
+        contactId: contact.id,
+      });
     }
 
-    // 6. Send WhatsApp message using Rudd's existing infrastructure
-    const accessToken = await decrypt(
-      waAccount.encryptedAccessToken,
-    );
+    const accessToken = await decrypt(waAccount.encryptedAccessToken);
+    const credentials = { to: waId, phoneNumberId: waAccount.phoneNumberId, accessToken };
 
-    const whatsappResult = await sendWhatsAppMessage({
-      to: phone,
-      body: message,
-      phoneNumberId: waAccount.phoneNumberId,
-      accessToken,
-    });
+    let sent: Awaited<ReturnType<typeof sendWhatsAppMessage>>;
+    let storedBody: string;
+    try {
+      if (template) {
+        sent = await sendWhatsAppTemplate({ ...credentials, template });
+        storedBody = message ?? `[Template: ${template.name}]`;
+      } else {
+        sent = await sendWhatsAppMessage({ ...credentials, body: message ?? "" });
+        storedBody = message ?? "";
+      }
+    } catch (err) {
+      if (isOutsideServiceWindowError(err)) return error(422, "template_required", { contactId: contact.id });
+      if (err instanceof WhatsAppApiError && err.status >= 400 && err.status < 500) {
+        return error(502, "whatsapp_rejected", { whatsappErrorCode: err.code ?? null });
+      }
+      throw err;
+    }
 
-    // 7. Save outbound message
+    const whatsappMessageId = sent.messages[0]?.id ?? null;
     await db.insert(messages).values({
       tenantId,
-      conversationId,
+      conversationId: conversation.id,
+      waMessageId: whatsappMessageId,
       direction: "outbound",
       role: "assistant",
-      body: message,
+      body: storedBody,
     });
-
-    // 8. Update conversation timestamp
-    await db
-      .update(conversations)
-      .set({
-        lastMessageAt: new Date(),
-      })
-      .where(eq(conversations.id, conversationId));
 
     return NextResponse.json({
       success: true,
-      contactId,
-      conversationId,
-      whatsappMessageId: whatsappResult.messages?.[0]?.id ?? null,
+      contactId: contact.id,
+      conversationId: conversation.id,
+      whatsappMessageId,
+      sentAs: template ? "template" : "text",
     });
-  } catch (error) {
-    console.error("[lead-hunter] outbound lead error:", error);
-
-    return NextResponse.json(
-      {
-        error: "Failed to send lead message",
-      },
-      { status: 500 },
-    );
+  } catch (err) {
+    console.error("[lead-hunter] outbound lead error:", err instanceof Error ? err.message : "unknown");
+    return error(500, "send_failed");
   }
 };

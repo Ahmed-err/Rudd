@@ -1,6 +1,6 @@
 import "server-only";
-import { db, conversations, contacts, messages } from "@rudd/db";
-import { eq, desc, and, asc, count } from "drizzle-orm";
+import { db, conversations, contacts, messages, withTenant } from "@rudd/db";
+import { eq, and, desc, count, sql } from "drizzle-orm";
 
 export type ConversationRow = {
   id: string;
@@ -13,6 +13,14 @@ export type ConversationRow = {
 };
 
 export const PAGE_SIZE = 20;
+const MESSAGE_LIMIT = 200;
+
+const lastMessageQuery = (column: "body" | "direction") =>
+  sql<string | null>`(
+    select ${sql.raw(`m.${column}`)} from ${messages} m
+    where m.conversation_id = ${conversations.id} and m.tenant_id = ${conversations.tenantId}
+    order by m.created_at desc limit 1
+  )`;
 
 export const listConversations = async (
   tenantId: string,
@@ -20,42 +28,26 @@ export const listConversations = async (
   waId?: string,
   page = 0,
 ): Promise<ConversationRow[]> => {
-  const conditions = [eq(conversations.tenantId, tenantId)];
+  const conditions = [withTenant(tenantId, conversations.tenantId)];
   if (status) conditions.push(eq(conversations.status, status));
   if (waId) conditions.push(eq(contacts.waId, waId));
 
-  const rows = await db
+  return db
     .select({
       id: conversations.id,
       status: conversations.status,
       lastMessageAt: conversations.lastMessageAt,
       contactName: contacts.name,
       contactWaId: contacts.waId,
+      lastMessage: lastMessageQuery("body"),
+      lastMessageDirection: lastMessageQuery("direction"),
     })
     .from(conversations)
     .innerJoin(contacts, eq(conversations.contactId, contacts.id))
     .where(and(...conditions))
-    .orderBy(desc(conversations.lastMessageAt))
+    .orderBy(sql`${conversations.lastMessageAt} desc nulls last`)
     .limit(PAGE_SIZE)
     .offset(page * PAGE_SIZE);
-
-  const withLastMsg = await Promise.all(
-    rows.map(async (row) => {
-      try {
-        const [msg] = await db
-          .select({ body: messages.body, direction: messages.direction })
-          .from(messages)
-          .where(and(eq(messages.conversationId, row.id), eq(messages.tenantId, tenantId)))
-          .orderBy(desc(messages.createdAt))
-          .limit(1);
-        return { ...row, lastMessage: msg?.body ?? null, lastMessageDirection: msg?.direction ?? null };
-      } catch {
-        return { ...row, lastMessage: null, lastMessageDirection: null };
-      }
-    }),
-  );
-
-  return withLastMsg;
 };
 
 export const countConversations = async (
@@ -63,7 +55,7 @@ export const countConversations = async (
   status?: string,
   waId?: string,
 ): Promise<number> => {
-  const conditions = [eq(conversations.tenantId, tenantId)];
+  const conditions = [withTenant(tenantId, conversations.tenantId)];
   if (status) conditions.push(eq(conversations.status, status));
   if (waId) conditions.push(eq(contacts.waId, waId));
 
@@ -88,6 +80,7 @@ export type ConversationDetail = {
   conversation: {
     id: string;
     status: string;
+    aiPaused: boolean;
     contactName: string | null;
     contactWaId: string;
   };
@@ -102,12 +95,13 @@ export const getConversationDetail = async (
     .select({
       id: conversations.id,
       status: conversations.status,
+      aiPaused: conversations.aiPaused,
       contactName: contacts.name,
       contactWaId: contacts.waId,
     })
     .from(conversations)
     .innerJoin(contacts, eq(conversations.contactId, contacts.id))
-    .where(and(eq(conversations.id, conversationId), eq(conversations.tenantId, tenantId)))
+    .where(and(withTenant(tenantId, conversations.tenantId), eq(conversations.id, conversationId)))
     .limit(1);
 
   if (!row) return null;
@@ -121,10 +115,10 @@ export const getConversationDetail = async (
       createdAt: messages.createdAt,
     })
     .from(messages)
-    .where(and(eq(messages.conversationId, conversationId), eq(messages.tenantId, tenantId)))
-    .orderBy(asc(messages.createdAt))
-    .limit(100);
+    .where(and(withTenant(tenantId, messages.tenantId), eq(messages.conversationId, conversationId)))
+    .orderBy(desc(messages.createdAt))
+    .limit(MESSAGE_LIMIT);
 
-  return { conversation: row, messages: msgs };
+  return { conversation: row, messages: msgs.reverse() };
 };
 

@@ -4,20 +4,15 @@ import { auth } from "@clerk/nextjs/server";
 import { db, tenants, agentSettings } from "@rudd/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { DEFAULT_WORKING_HOURS, serviceSchema, timezoneSchema } from "@rudd/shared";
 
 const setupSchema = z.object({
-  businessName: z.string().min(1),
-  timezone: z.string().min(1).default("UTC"),
-  services: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      duration_minutes: z.number().int().positive(),
-    }),
-  ),
+  businessName: z.string().trim().min(1).max(200),
+  timezone: timezoneSchema.default("UTC"),
+  services: z.array(serviceSchema).min(1).max(50),
 });
 
-export type SetupInput = z.infer<typeof setupSchema>;
+export type SetupInput = z.input<typeof setupSchema>;
 
 export const completeTenantSetup = async (input: SetupInput): Promise<{ ok: true }> => {
   const { orgId } = await auth();
@@ -45,13 +40,7 @@ export const completeTenantSetup = async (input: SetupInput): Promise<{ ok: true
       tenantId: tenant.id,
       businessName: parsed.businessName,
       timezone: parsed.timezone,
-      workingHours: {
-        Mon: "9am-5pm",
-        Tue: "9am-5pm",
-        Wed: "9am-5pm",
-        Thu: "9am-5pm",
-        Fri: "9am-5pm",
-      },
+      workingHours: DEFAULT_WORKING_HOURS,
       services: parsed.services,
     })
     .onConflictDoUpdate({

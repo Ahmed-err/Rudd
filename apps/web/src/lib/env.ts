@@ -1,8 +1,5 @@
 import { z } from "zod";
 
-// Each group is validated lazily when first accessed, so the app only crashes
-// if you actually use a missing var — not on every cold start.
-
 // Only these two are needed for webhook verification (GET + POST signature check).
 // Keeping them separate avoids crashing the webhook route if the send-side vars are misconfigured.
 const whatsappWebhookSchema = z.object({
@@ -17,10 +14,17 @@ const clerkSchema = z.object({
   CLERK_WEBHOOK_SECRET: z.string().min(1),
 });
 
-const openaiSchema = z.object({
-  GROQ_API_KEY: z.string().min(1).optional(),
-  OPENAI_API_KEY: z.string().min(1).optional(),
-});
+const llmSchema = z
+  .object({
+    GROQ_API_KEY: z.string().min(1).optional(),
+    GROQ_MODEL: z.string().min(1).optional(),
+    GROQ_TRANSCRIPTION_MODEL: z.string().min(1).optional(),
+    OPENAI_API_KEY: z.string().min(1).optional(),
+  })
+  .refine((v) => v.GROQ_API_KEY || v.OPENAI_API_KEY, {
+    message: "Set GROQ_API_KEY or OPENAI_API_KEY",
+    path: ["GROQ_API_KEY"],
+  });
 
 const googleSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(1),
@@ -50,33 +54,81 @@ const leadHunterSchema = z.object({
   LEADHUNTER_TENANT_ID: z.string().uuid(),
 });
 
-const makeGroup = <T extends z.ZodRawShape>(schema: z.ZodObject<T>, label: string) => {
-  let cached: z.infer<typeof schema> | null = null;
-  return new Proxy({} as z.infer<typeof schema>, {
-    get(_target, prop) {
-      if (!cached) {
-        // biome-ignore lint/suspicious/noExplicitAny: validated below
-        const result = schema.safeParse(process.env as any);
-        if (!result.success) {
-          const missing = result.error.issues
-            .map((i) => `  ${i.path.join(".")}: ${i.message}`)
-            .join("\n");
-          throw new Error(`[env:${label}] Missing / invalid environment variables:\n${missing}`);
-        }
-        cached = result.data;
-      }
-      return cached[prop as keyof typeof cached];
-    },
-  });
+const notificationsSchema = z.object({
+  RESEND_API_KEY: z.string().min(1).optional(),
+  // Must be on a domain verified in Resend; the resend.dev sandbox only delivers to the account owner.
+  RESEND_FROM_EMAIL: z.string().min(3).default("Rudd <notifications@resend.dev>"),
+  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+});
+
+// `FOO=` in an env file yields "", which should mean "unset" so optional vars and defaults work.
+const definedEnv = (): Record<string, string> =>
+  Object.fromEntries(Object.entries(process.env).filter((e): e is [string, string] => !!e[1]?.trim()));
+
+const parseGroup = <S extends z.ZodTypeAny>(schema: S, label: string): z.infer<S> => {
+  const result = schema.safeParse(definedEnv());
+  if (!result.success) {
+    const missing = result.error.issues
+      .map((i) => `  ${i.path.join(".")}: ${i.message}`)
+      .join("\n");
+    throw new Error(`[env:${label}] Missing / invalid environment variables:\n${missing}`);
+  }
+  return result.data;
 };
 
-export const env = {
+// Validated on first access so a build without secrets still succeeds;
+// validateEnvAtStartup() makes production crash on boot instead of on first use.
+const makeGroup = <S extends z.ZodTypeAny>(schema: S, label: string) => {
+  let cached: z.infer<S> | null = null;
+  const load = (): z.infer<S> => {
+    cached ??= parseGroup(schema, label);
+    return cached;
+  };
+  const proxy = new Proxy({} as z.infer<S>, {
+    get(_target, prop) {
+      return load()[prop as keyof z.infer<S>];
+    },
+  });
+  return { proxy, load };
+};
+
+const groups = {
   whatsappWebhook: makeGroup(whatsappWebhookSchema, "whatsapp.webhook"),
   clerk: makeGroup(clerkSchema, "clerk"),
-  openai: makeGroup(openaiSchema, "openai"),
+  llm: makeGroup(llmSchema, "llm"),
   google: makeGroup(googleSchema, "google"),
   db: makeGroup(dbSchema, "db"),
   inngest: makeGroup(inngestSchema, "inngest"),
   crypto: makeGroup(cryptoSchema, "crypto"),
   leadHunter: makeGroup(leadHunterSchema, "leadHunter"),
+  notifications: makeGroup(notificationsSchema, "notifications"),
+};
+
+const REQUIRED_AT_STARTUP = ["whatsappWebhook", "clerk", "llm", "google", "db", "crypto"] as const;
+
+export const validateEnvAtStartup = (): void => {
+  const errors: string[] = [];
+  for (const name of REQUIRED_AT_STARTUP) {
+    try {
+      groups[name].load();
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+  if (process.env.NODE_ENV === "production" && !process.env.INNGEST_SIGNING_KEY) {
+    errors.push("[env:inngest] INNGEST_SIGNING_KEY is required in production");
+  }
+  if (errors.length) throw new Error(errors.join("\n"));
+};
+
+export const env = {
+  whatsappWebhook: groups.whatsappWebhook.proxy,
+  clerk: groups.clerk.proxy,
+  llm: groups.llm.proxy,
+  google: groups.google.proxy,
+  db: groups.db.proxy,
+  inngest: groups.inngest.proxy,
+  crypto: groups.crypto.proxy,
+  leadHunter: groups.leadHunter.proxy,
+  notifications: groups.notifications.proxy,
 };

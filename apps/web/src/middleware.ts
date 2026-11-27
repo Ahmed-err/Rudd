@@ -1,7 +1,7 @@
 import { type NextFetchEvent, NextResponse, type NextRequest } from "next/server";
 
-// Clerk is only activated once NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is set.
-// Webhook routes bypass auth entirely — they verify via HMAC signature.
+// Without a Clerk key, dev runs unauthenticated; production refuses to serve.
+// Webhook/API routes bypass Clerk — each verifies its own signature or bearer key.
 const CLERK_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 const isWebhookPath = (pathname: string) =>
@@ -18,6 +18,9 @@ export async function middleware(req: NextRequest, event: NextFetchEvent) {
   }
 
   if (!CLERK_KEY) {
+    if (process.env.NODE_ENV === "production") {
+      return new NextResponse("Authentication is not configured", { status: 503 });
+    }
     return NextResponse.next();
   }
 

@@ -1,57 +1,58 @@
 import "server-only";
-import { db } from "@rudd/db";
 import {
+  db,
   agentSettings,
   contacts,
   conversations,
   messages,
-  tenants,
   waAccounts,
   webhookEvents,
+  withTenant,
 } from "@rudd/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { parseServices, parseWorkingHours } from "@rudd/shared";
 import { inngest } from "./client";
+import { INCOMING_MESSAGE_EVENT, incomingMessageEventSchema } from "./events";
 import { runAssistant } from "../agent/runner";
-import { sendWhatsAppMessage } from "../whatsapp/client";
+import { transcribeAudio } from "../agent/llm";
+import { downloadWhatsAppMedia, sendWhatsAppMessage } from "../whatsapp/client";
 import { decrypt } from "../crypto";
 
-export type IncomingMessageEventData = {
-  phoneNumberId: string;
-  waMessageId: string;
-  from: string;
-  contactName: string | undefined;
-  body: string;
-  timestamp: string;
+const getAccessToken = async (tenantId: string): Promise<string> => {
+  const [row] = await db
+    .select({ encryptedAccessToken: waAccounts.encryptedAccessToken })
+    .from(waAccounts)
+    .where(withTenant(tenantId, waAccounts.tenantId))
+    .limit(1);
+  if (!row) throw new Error("WhatsApp account disconnected");
+  return decrypt(row.encryptedAccessToken);
 };
 
+const markProcessed = async (tenantId: string, waMessageId: string): Promise<void> => {
+  await db
+    .update(webhookEvents)
+    .set({ processedAt: new Date(), tenantId })
+    .where(eq(webhookEvents.waMessageId, waMessageId));
+};
+
+// Each external call is its own step: a failure retries only that step, and completed
+// steps (including the inbound insert) are memoised, so a retry can never mistake
+// its own earlier write for a Meta duplicate and drop the reply.
 export const handleIncomingMessage = inngest.createFunction(
   {
     id: "handle-incoming-message",
-    triggers: [{ event: "wa/message.received" }],
+    triggers: [{ event: INCOMING_MESSAGE_EVENT }],
     retries: 3,
-    concurrency: { limit: 1, key: "event.data.from" },
-    // Hard cap so a stuck run can't block the per-user concurrency queue forever.
-    // 45s covers worst-case: cold Neon (1s) + 3-round LLM (24s) + WA send (8s) + slack.
-    timeouts: { finish: "45s" },
+    concurrency: { limit: 1, key: 'event.data.phoneNumberId + "-" + event.data.from' },
+    timeouts: { finish: "3m" },
   },
   async ({ event, step }) => {
-    const {
-      phoneNumberId,
-      waMessageId,
-      from,
-      contactName,
-      body,
-    } = event.data as IncomingMessageEventData;
+    const data = incomingMessageEventSchema.parse(event.data);
 
-    // Single step — Inngest step boundaries cost ~500ms each on hobby tier.
-    // Trade-off: on transient failure the LLM call is repeated. Acceptable because
-    // (a) failures are rare and (b) Meta will redeliver anyway, so a "preserved"
-    // LLM result wouldn't help if WA send dies permanently.
-    const result = await step.run("process-message", async () => {
-      const [waAccount] = await db
+    const tenant = await step.run("resolve-tenant", async () => {
+      const [row] = await db
         .select({
           tenantId: waAccounts.tenantId,
-          encryptedAccessToken: waAccounts.encryptedAccessToken,
           businessName: agentSettings.businessName,
           systemPrompt: agentSettings.systemPromptOverride,
           services: agentSettings.services,
@@ -59,84 +60,138 @@ export const handleIncomingMessage = inngest.createFunction(
           timezone: agentSettings.timezone,
         })
         .from(waAccounts)
-        .innerJoin(tenants, eq(waAccounts.tenantId, tenants.id))
-        .leftJoin(agentSettings, eq(agentSettings.tenantId, tenants.id))
-        .where(eq(waAccounts.phoneNumberId, phoneNumberId))
+        .leftJoin(agentSettings, eq(agentSettings.tenantId, waAccounts.tenantId))
+        .where(eq(waAccounts.phoneNumberId, data.phoneNumberId))
         .limit(1);
+      return row ?? null;
+    });
 
-      if (!waAccount) throw new Error(`No tenant found for phoneNumberId=${phoneNumberId}`);
+    if (!tenant) {
+      console.warn("[inngest] message for an unregistered phone number — ignoring");
+      return { ok: false, reason: "unknown_phone_number" };
+    }
 
+    let body = data.body;
+    if (data.audioMediaId) {
+      const mediaId = data.audioMediaId;
+      const transcript = await step.run("transcribe-audio", async () => {
+        try {
+          const { bytes, mimeType } = await downloadWhatsAppMedia(mediaId, await getAccessToken(tenant.tenantId));
+          return await transcribeAudio(bytes, mimeType);
+        } catch (err) {
+          console.warn("[inngest] transcription failed:", err instanceof Error ? err.message : "unknown");
+          return "";
+        }
+      });
+      if (transcript) body = `[Voice message] ${transcript}`;
+    }
+
+    const persisted = await step.run("persist-inbound", async () => {
       const [contactRow] = await db
         .insert(contacts)
-        .values({ tenantId: waAccount.tenantId, waId: from, name: contactName })
+        .values({ tenantId: tenant.tenantId, waId: data.from, name: data.contactName })
         .onConflictDoUpdate({
           target: [contacts.tenantId, contacts.waId],
-          set: { name: contactName ?? contacts.name },
+          set: data.contactName ? { name: data.contactName } : { updatedAt: new Date() },
         })
         .returning({ id: contacts.id });
       if (!contactRow) throw new Error("Failed to upsert contact");
 
+      const now = new Date();
       const [convRow] = await db
         .insert(conversations)
-        .values({ tenantId: waAccount.tenantId, contactId: contactRow.id, lastMessageAt: new Date() })
+        .values({ tenantId: tenant.tenantId, contactId: contactRow.id, lastMessageAt: now })
         .onConflictDoUpdate({
           target: [conversations.tenantId, conversations.contactId],
-          set: { lastMessageAt: new Date() },
+          set: { lastMessageAt: now },
         })
-        .returning({ id: conversations.id });
+        .returning({ id: conversations.id, status: conversations.status, aiPaused: conversations.aiPaused });
       if (!convRow) throw new Error("Failed to upsert conversation");
 
-      // Idempotency: returning is empty when the row already existed → Meta retry, bail.
+      // A new message on a resolved conversation reopens it.
+      if (convRow.status === "resolved") {
+        await db
+          .update(conversations)
+          .set({ status: "active" })
+          .where(and(withTenant(tenant.tenantId, conversations.tenantId), eq(conversations.id, convRow.id)));
+      }
+
       const inserted = await db
         .insert(messages)
         .values({
-          tenantId: waAccount.tenantId,
+          tenantId: tenant.tenantId,
           conversationId: convRow.id,
-          waMessageId,
+          waMessageId: data.waMessageId,
           direction: "inbound",
           role: "user",
           body,
         })
         .onConflictDoNothing({ target: messages.waMessageId })
         .returning({ id: messages.id });
-      if (!inserted.length) {
-        console.log(`[inngest] duplicate webhook for waMessageId=${waMessageId} — skipping`);
-        return { ok: true, duplicate: true };
-      }
 
-      const reply = await runAssistant({
-        tenantId: waAccount.tenantId,
-        conversationId: convRow.id,
+      return {
+        duplicate: inserted.length === 0,
         contactId: contactRow.id,
-        userMessage: body,
-        context: {
-          businessName: waAccount.businessName ?? "this business",
-          services: waAccount.services ?? [],
-          workingHours: waAccount.workingHours,
-          timezone: waAccount.timezone ?? "UTC",
-          systemPrompt: waAccount.systemPrompt ?? undefined,
-        },
-      });
-
-      const accessToken = await decrypt(waAccount.encryptedAccessToken);
-      const now = new Date();
-
-      await Promise.all([
-        sendWhatsAppMessage({ to: from, body: reply, phoneNumberId, accessToken }),
-        db.insert(messages).values({
-          tenantId: waAccount.tenantId,
-          conversationId: convRow.id,
-          direction: "outbound",
-          role: "assistant",
-          body: reply,
-        }),
-        db.update(conversations).set({ lastMessageAt: now }).where(eq(conversations.id, convRow.id)),
-        db.update(webhookEvents).set({ processedAt: now, tenantId: waAccount.tenantId }).where(eq(webhookEvents.waMessageId, waMessageId)),
-      ]);
-
-      return { ok: true, reply };
+        conversationId: convRow.id,
+        aiPaused: convRow.aiPaused,
+      };
     });
 
-    return result;
+    if (persisted.duplicate) return { ok: true, duplicate: true };
+
+    if (persisted.aiPaused) {
+      await step.run("mark-processed", () => markProcessed(tenant.tenantId, data.waMessageId));
+      return { ok: true, skipped: "ai_paused" };
+    }
+
+    const reply = await step.run("generate-reply", () =>
+      runAssistant({
+        tenantId: tenant.tenantId,
+        conversationId: persisted.conversationId,
+        contactId: persisted.contactId,
+        userMessage: body,
+        context: {
+          businessName: tenant.businessName ?? "this business",
+          services: parseServices(tenant.services),
+          workingHours: parseWorkingHours(tenant.workingHours),
+          timezone: tenant.timezone ?? "UTC",
+          systemPrompt: tenant.systemPrompt ?? undefined,
+        },
+      }),
+    );
+
+    const sentId = await step.run("send-reply", async () => {
+      const result = await sendWhatsAppMessage({
+        to: data.from,
+        body: reply,
+        phoneNumberId: data.phoneNumberId,
+        accessToken: await getAccessToken(tenant.tenantId),
+      });
+      return result.messages[0]?.id ?? null;
+    });
+
+    await step.run("record-reply", async () => {
+      const now = new Date();
+      await Promise.all([
+        db
+          .insert(messages)
+          .values({
+            tenantId: tenant.tenantId,
+            conversationId: persisted.conversationId,
+            waMessageId: sentId,
+            direction: "outbound",
+            role: "assistant",
+            body: reply,
+          })
+          .onConflictDoNothing({ target: messages.waMessageId }),
+        db
+          .update(conversations)
+          .set({ lastMessageAt: now })
+          .where(and(withTenant(tenant.tenantId, conversations.tenantId), eq(conversations.id, persisted.conversationId))),
+        markProcessed(tenant.tenantId, data.waMessageId),
+      ]);
+    });
+
+    return { ok: true };
   },
 );

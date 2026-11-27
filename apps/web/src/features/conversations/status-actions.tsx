@@ -1,27 +1,45 @@
 "use client";
 
-import { useTransition } from "react";
+import { useTransition, type ReactElement } from "react";
 import { Button } from "@/components/ui/button";
-import { setConversationStatus } from "./actions";
+import { setAiPaused, setConversationStatus } from "./actions";
 import type { T } from "@/lib/i18n/translations";
 
 type Props = {
   conversationId: string;
   status: string;
+  aiPaused: boolean;
   t: T["conversations"]["detail"];
 };
 
-export const StatusActions = ({ conversationId, status, t }: Props) => {
+export const StatusActions = ({ conversationId, status, aiPaused, t }: Props): ReactElement => {
   const [isPending, startTransition] = useTransition();
 
-  const update = (next: "active" | "resolved" | "escalated") => {
+  const update = (next: "active" | "resolved" | "escalated"): void => {
     startTransition(async () => {
       await setConversationStatus(conversationId, next);
     });
   };
 
+  const toggleAi = (): void => {
+    startTransition(async () => {
+      await setAiPaused(conversationId, !aiPaused);
+    });
+  };
+
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
+      {status !== "resolved" && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={toggleAi}
+          disabled={isPending}
+          className={aiPaused ? "text-blue-700 border-blue-300 hover:bg-blue-50" : "text-gray-700 border-gray-300 hover:bg-gray-50"}
+        >
+          {aiPaused ? t.resumeAi : t.pauseAi}
+        </Button>
+      )}
       {status !== "resolved" && (
         <Button
           size="sm"

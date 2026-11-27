@@ -70,6 +70,8 @@ export default async function AppointmentsPage({
                         appointmentId={a.id}
                         label={t.appointments.cancel}
                         cancellingLabel={t.appointments.cancelling}
+                        confirmLabel={t.appointments.confirmCancel}
+                        notNotifiedLabel={t.appointments.notNotified}
                       />
                     )}
                   </TableCell>

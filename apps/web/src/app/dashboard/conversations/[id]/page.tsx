@@ -54,9 +54,16 @@ export default async function ConversationDetailPage({
         <StatusActions
           conversationId={conversation.id}
           status={conversation.status}
+          aiPaused={conversation.aiPaused}
           t={t.conversations.detail}
         />
       </div>
+
+      {conversation.aiPaused && conversation.status !== "resolved" && (
+        <div className="mt-3 rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-sm text-blue-800">
+          {t.conversations.detail.aiPausedNote}
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto py-4 space-y-3">

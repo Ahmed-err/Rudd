@@ -19,3 +19,9 @@ apps/web/.env.local
 *.pem
 .turbo
 .vercel
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# npm lockfile (this repo uses pnpm)
+package-lock.json
