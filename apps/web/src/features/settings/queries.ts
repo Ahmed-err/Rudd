@@ -10,6 +10,10 @@ export type AgentSettingsRow = {
   services: unknown;
   systemPromptOverride: string | null;
   notificationEmail: string | null;
+  remindersEnabled: boolean;
+  reminderHoursBefore: number;
+  reminderTemplateName: string | null;
+  reminderTemplateLanguage: string;
 };
 
 export const getAgentSettings = async (tenantId: string): Promise<AgentSettingsRow | null> => {

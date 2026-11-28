@@ -8,6 +8,7 @@ import {
   captureLeadSchema,
   escalateToHumanSchema,
   proposeSlotsSchema,
+  rescheduleAppointmentSchema,
 } from "./tools";
 import {
   MAX_RANGE_DAYS,
@@ -21,7 +22,7 @@ import {
   zonedToUtc,
 } from "./availability";
 import { cancelAppointmentForTenant, getBusyIntervals } from "@/server/appointments";
-import { createCalendarEvent } from "@/server/calendar/client";
+import { createCalendarEvent, updateCalendarEvent } from "@/server/calendar/client";
 import { sendEscalationEmail } from "@/server/notifications";
 
 export type HandlerContext = {
@@ -122,30 +123,53 @@ const isUniqueViolation = (err: unknown): boolean => {
   return false;
 };
 
+type SlotCheck =
+  | { ok: true; startAt: Date; endAt: Date }
+  | { ok: false; response: string };
+
+// `ignore` is the appointment being moved: its own DB row and calendar event must not count as a clash.
+const checkSlot = async (
+  ctx: HandlerContext,
+  service: Service,
+  start: string,
+  ignore?: { start: Date; end: Date },
+): Promise<SlotCheck> => {
+  const startAt = parseDateTime(start, ctx.timeZone);
+  if (!startAt) {
+    return { ok: false, response: json({ error: "invalid_start", hint: "Use the exact `start` value returned by proposeSlots" }) };
+  }
+  const endAt = new Date(startAt.getTime() + service.duration_minutes * 60_000);
+  const slot = { start: startAt, end: endAt };
+
+  const fail = async (reason: string): Promise<SlotCheck> => {
+    const day = toLocalParts(startAt, ctx.timeZone).date;
+    const alternatives = describeSlots(ctx, await findSlots(ctx, service, day, addDays(day, 2), 3));
+    return { ok: false, response: json({ success: false, reason, alternatives }) };
+  };
+
+  if (startAt <= ctx.now) return fail("time_in_past");
+  if (!isWithinWorkingHours(slot, ctx.workingHours, ctx.timeZone)) return fail("outside_working_hours");
+
+  const busy = (await getBusyIntervals(ctx.tenantId, startAt, endAt)).filter(
+    (b) => !ignore || b.start.getTime() !== ignore.start.getTime() || b.end.getTime() !== ignore.end.getTime(),
+  );
+  if (busy.some((b) => overlaps(slot, b))) return fail("slot_taken");
+
+  return { ok: true, startAt, endAt };
+};
+
 export const handleBookAppointment = async (rawArgs: unknown, ctx: HandlerContext): Promise<string> => {
   const args = bookAppointmentSchema.parse(rawArgs);
   const service = resolveService(ctx, args.service_id);
   if (!service) return unknownService(ctx);
 
-  const startAt = parseDateTime(args.start, ctx.timeZone);
-  if (!startAt) return json({ error: "invalid_start", hint: "Use the exact `start` value returned by proposeSlots" });
-  const endAt = new Date(startAt.getTime() + service.duration_minutes * 60_000);
-  const slot = { start: startAt, end: endAt };
-
+  const check = await checkSlot(ctx, service, args.start);
+  if (!check.ok) return check.response;
+  const { startAt, endAt } = check;
   const alternatives = async (): Promise<unknown> => {
     const day = toLocalParts(startAt, ctx.timeZone).date;
     return describeSlots(ctx, await findSlots(ctx, service, day, addDays(day, 2), 3));
   };
-
-  if (startAt <= ctx.now) return json({ success: false, reason: "time_in_past", alternatives: await alternatives() });
-  if (!isWithinWorkingHours(slot, ctx.workingHours, ctx.timeZone)) {
-    return json({ success: false, reason: "outside_working_hours", alternatives: await alternatives() });
-  }
-
-  const busy = await getBusyIntervals(ctx.tenantId, startAt, endAt);
-  if (busy.some((b) => overlaps(slot, b))) {
-    return json({ success: false, reason: "slot_taken", alternatives: await alternatives() });
-  }
 
   let appointmentId: string | undefined;
   try {
@@ -205,6 +229,68 @@ export const handleBookAppointment = async (rawArgs: unknown, ctx: HandlerContex
     service: service.name,
     start: formatLocalIso(startAt, ctx.timeZone),
     end: formatLocalIso(endAt, ctx.timeZone),
+    calendar_synced: calendarSynced,
+  });
+};
+
+export const handleRescheduleAppointment = async (rawArgs: unknown, ctx: HandlerContext): Promise<string> => {
+  const args = rescheduleAppointmentSchema.parse(rawArgs);
+
+  const [existing] = await db
+    .select({
+      serviceId: appointments.serviceId,
+      startAt: appointments.startAt,
+      endAt: appointments.endAt,
+      gcalEventId: appointments.gcalEventId,
+    })
+    .from(appointments)
+    .where(
+      and(
+        withTenant(ctx.tenantId, appointments.tenantId),
+        eq(appointments.id, args.appointment_id),
+        eq(appointments.contactId, ctx.contactId),
+        eq(appointments.status, "scheduled"),
+      ),
+    )
+    .limit(1);
+  if (!existing) return json({ success: false, reason: "not_found_or_not_scheduled" });
+
+  const service = resolveService(ctx, existing.serviceId ?? "general");
+  if (!service) return unknownService(ctx);
+
+  const check = await checkSlot(ctx, service, args.new_start, { start: existing.startAt, end: existing.endAt });
+  if (!check.ok) return check.response;
+
+  try {
+    await db
+      .update(appointments)
+      .set({ startAt: check.startAt, endAt: check.endAt, reminderSentAt: null, updatedAt: new Date() })
+      .where(and(withTenant(ctx.tenantId, appointments.tenantId), eq(appointments.id, args.appointment_id)));
+  } catch (err) {
+    if (isUniqueViolation(err)) return json({ success: false, reason: "slot_taken" });
+    throw err;
+  }
+
+  let calendarSynced = !existing.gcalEventId;
+  if (existing.gcalEventId) {
+    try {
+      await updateCalendarEvent(ctx.tenantId, existing.gcalEventId, {
+        startIso: check.startAt.toISOString(),
+        endIso: check.endAt.toISOString(),
+        timezone: ctx.timeZone,
+      });
+      calendarSynced = true;
+    } catch (err) {
+      console.warn("[handlers] calendar update failed:", err instanceof Error ? err.message : "unknown");
+    }
+  }
+
+  return json({
+    success: true,
+    appointment_id: args.appointment_id,
+    previous_start: formatLocalIso(existing.startAt, ctx.timeZone),
+    start: formatLocalIso(check.startAt, ctx.timeZone),
+    end: formatLocalIso(check.endAt, ctx.timeZone),
     calendar_synced: calendarSynced,
   });
 };
@@ -282,6 +368,8 @@ export const dispatchToolCall = async (name: string, args: unknown, ctx: Handler
       return handleProposeSlots(args, ctx);
     case "bookAppointment":
       return handleBookAppointment(args, ctx);
+    case "rescheduleAppointment":
+      return handleRescheduleAppointment(args, ctx);
     case "cancelAppointment":
       return handleCancelAppointment(args, ctx);
     case "captureLead":

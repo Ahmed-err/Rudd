@@ -218,6 +218,29 @@ export const createCalendarEvent = async (
   return event.id;
 };
 
+export const updateCalendarEvent = async (
+  tenantId: string,
+  gcalEventId: string,
+  input: { startIso: string; endIso: string; timezone: string },
+): Promise<void> => {
+  const { accessToken, calendarId } = await getAccessTokenForTenant(tenantId);
+
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(gcalEventId)}`,
+    {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        start: { dateTime: input.startIso, timeZone: input.timezone },
+        end: { dateTime: input.endIso, timeZone: input.timezone },
+      }),
+      signal: AbortSignal.timeout(GCAL_TIMEOUT_MS),
+    },
+  );
+
+  if (!res.ok) throw new Error(`Update event failed with status ${res.status}`);
+};
+
 // ── Delete calendar event ──────────────────────────────────────────────────────
 
 export const deleteCalendarEvent = async (

@@ -38,14 +38,14 @@ export const ReplyBox = ({ conversationId, status, placeholder, sendLabel, sendi
 
   if (status === "resolved") {
     return (
-      <div className="border-t pt-3 shrink-0">
+      <div className="shrink-0 border-t px-4 py-3">
         <p className="text-xs text-muted-foreground text-center py-2">{resolvedNote}</p>
       </div>
     );
   }
 
   return (
-    <div className="border-t pt-3 shrink-0 space-y-2">
+    <div className="shrink-0 space-y-2 border-t px-4 py-3">
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2 items-end">
         <textarea

@@ -5,8 +5,8 @@ import { Geist, Noto_Sans_Arabic } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { getLocale } from "@/lib/i18n/server";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
-const notoArabic = Noto_Sans_Arabic({ subsets: ["arabic"], variable: "--font-arabic" });
+const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
+const notoArabic = Noto_Sans_Arabic({ subsets: ["arabic"], variable: "--font-noto-arabic" });
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://rudd.sarmadax.com";
 
@@ -35,7 +35,7 @@ const RootLayout = async ({ children }: { children: ReactNode }) => {
   if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
     const { ClerkProvider } = await import("@clerk/nextjs");
     return (
-      <ClerkProvider>
+      <ClerkProvider appearance={{ variables: { colorPrimary: "#0e7a5a", borderRadius: "0.75rem" } }}>
         <html lang={locale} dir={dir} className={htmlClass}>
           <body>{children}</body>
         </html>

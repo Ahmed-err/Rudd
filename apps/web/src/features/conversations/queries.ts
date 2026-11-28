@@ -122,3 +122,16 @@ export const getConversationDetail = async (
   return { conversation: row, messages: msgs.reverse() };
 };
 
+
+export const countNeedsAttention = async (tenantId: string): Promise<number> => {
+  const [row] = await db
+    .select({ count: count() })
+    .from(conversations)
+    .where(
+      and(
+        withTenant(tenantId, conversations.tenantId),
+        sql`(${conversations.status} = 'escalated' or (${conversations.aiPaused} and ${conversations.status} <> 'resolved'))`,
+      ),
+    );
+  return row?.count ?? 0;
+};

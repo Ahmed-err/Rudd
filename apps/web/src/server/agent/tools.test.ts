@@ -40,6 +40,7 @@ describe("zodToJsonSchema", () => {
       "listServices",
       "proposeSlots",
       "bookAppointment",
+      "rescheduleAppointment",
       "cancelAppointment",
       "captureLead",
       "escalateToHuman",

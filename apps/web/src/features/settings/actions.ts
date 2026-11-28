@@ -117,3 +117,37 @@ export const saveServices = async (services: unknown[]): Promise<void> => {
 
   revalidatePath("/dashboard/settings");
 };
+
+const reminderSettingsSchema = z.object({
+  enabled: z.boolean(),
+  hoursBefore: z.coerce.number().int().min(1).max(72),
+  templateName: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9_]{1,512}$/, "Template names use lowercase letters, numbers and underscores")
+    .optional()
+    .or(z.literal("")),
+  templateLanguage: z.string().trim().regex(/^[a-z]{2,3}(_[A-Z]{2})?$/, "e.g. en, ar, en_US"),
+});
+
+export type ReminderSettingsInput = z.input<typeof reminderSettingsSchema>;
+
+export const saveReminderSettings = async (input: ReminderSettingsInput): Promise<{ ok: true } | { ok: false; error: string }> => {
+  const { tenantId } = await getSessionTenant();
+  const parsed = reminderSettingsSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid settings" };
+
+  await db
+    .update(agentSettings)
+    .set({
+      remindersEnabled: parsed.data.enabled,
+      reminderHoursBefore: parsed.data.hoursBefore,
+      reminderTemplateName: parsed.data.templateName || null,
+      reminderTemplateLanguage: parsed.data.templateLanguage,
+      updatedAt: new Date(),
+    })
+    .where(withTenant(tenantId, agentSettings.tenantId));
+
+  revalidatePath("/dashboard/settings");
+  return { ok: true };
+};

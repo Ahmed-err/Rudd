@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { CreateOrganization } from "@clerk/nextjs";
 import { getT } from "@/lib/i18n/server";
+import { BrandLogo } from "@/components/brand-logo";
 
 export default async function OnboardingPage() {
   const { userId, orgId } = await auth();
@@ -12,6 +13,7 @@ export default async function OnboardingPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-background p-4">
+      <BrandLogo name={t.nav.brand} />
       <div className="text-center space-y-1">
         <h1 className="text-2xl font-bold">{t.onboarding.welcome}</h1>
         <p className="text-muted-foreground text-sm">{t.onboarding.createWorkspace}</p>

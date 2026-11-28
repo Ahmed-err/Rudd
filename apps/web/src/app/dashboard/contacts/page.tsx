@@ -1,3 +1,5 @@
+import { Users } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
 import { getSessionTenant } from "@/lib/session";
 import { getT } from "@/lib/i18n/server";
@@ -30,15 +32,18 @@ export default async function ContactsPage({
   ]);
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">{t.contacts.title}</h1>
+    <div className="space-y-6">
+      <PageHeader title={t.contacts.title} description={t.contacts.subtitle} />
 
       {contacts.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t.contacts.empty}</p>
+        <div className="rounded-xl border border-dashed bg-card px-6 py-14 text-center">
+          <Users className="mx-auto size-8 text-muted-foreground" aria-hidden />
+          <p className="mt-3 text-sm text-muted-foreground">{t.contacts.empty}</p>
+        </div>
       ) : (
         <>
-        <div className="rounded-md border">
-          <Table className="table-fixed w-full">
+        <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
+          <Table className="min-w-[44rem] table-fixed">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-40">{t.contacts.columns.name}</TableHead>
@@ -53,7 +58,7 @@ export default async function ContactsPage({
               {contacts.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium truncate">{c.name ?? "—"}</TableCell>
-                  <TableCell className="text-sm">{c.waId}</TableCell>
+                  <TableCell className="text-sm tabular-nums" dir="ltr">+{c.waId}</TableCell>
                   <TableCell>
                     <Badge
                       className={leadStatusColor[c.leadStatus] ?? "bg-gray-100 text-gray-800"}

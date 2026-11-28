@@ -36,6 +36,8 @@ npx inngest-cli@latest dev        # in another terminal: local Inngest Dev Serve
 pnpm dev                          # starts Next.js on http://localhost:3000
 ```
 
+**Local Postgres instead of Neon:** when `DATABASE_URL` points at `localhost`, the app uses the standard `pg` driver, so a plain local Postgres works. Leave the Clerk keys unset in development to skip sign-in (the dashboard uses the first tenant). Integration tests in `*.integration.test.ts` run only against a localhost database.
+
 After changing `packages/db/schema.ts`, run `pnpm --filter @rudd/db generate` and commit the new migration; CI fails if the schema and migrations disagree.
 
 ### Expose the Webhook Locally
@@ -72,6 +74,16 @@ CI (`.github/workflows/ci.yml`) runs all three plus a migration drift check and 
 2. The Inngest function runs separate, independently retried steps: resolve tenant → transcribe voice note (if any) → store inbound message → generate reply → send → record.
 3. The agent only offers times computed from the business's working hours, timezone, existing appointments and Google Calendar free/busy.
 4. When the AI escalates, an owner escalates, or an owner replies from the dashboard, the AI pauses for that conversation until someone clicks **Resume AI**, reopens or resolves it.
+
+## Appointment Reminders
+
+Enable in **Settings → Reminders**. An Inngest cron checks every 15 minutes and messages customers the configured number of hours before their appointment. Inside WhatsApp's 24-hour window a normal message is sent; outside it, an approved template is required. Create a **Utility** template in Meta Business Manager with three body variables:
+
+```
+Hi {{1}}, this is a reminder of your appointment at {{2}} on {{3}}. Reply to this message to reschedule or cancel.
+```
+
+`{{1}}` customer name, `{{2}}` business name, `{{3}}` date and time.
 
 ## LeadHunter Outbound API
 

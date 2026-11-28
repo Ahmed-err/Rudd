@@ -7,7 +7,7 @@ import { StatusActions } from "@/features/conversations/status-actions";
 import { ReplyBox } from "@/features/conversations/reply-box";
 import { AutoRefresh } from "@/features/conversations/auto-refresh";
 import { MessageList } from "@/features/conversations/message-list";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/status-badge";
 
 export default async function ConversationDetailPage({
   params,
@@ -22,17 +22,11 @@ export default async function ConversationDetailPage({
 
   const { conversation, messages } = detail;
 
-  const statusColor: Record<string, string> = {
-    active: "bg-green-100 text-green-800",
-    resolved: "bg-gray-100 text-gray-800",
-    escalated: "bg-red-100 text-red-800",
-  };
-
   return (
-    <div className="flex flex-col h-[calc(100vh-3rem)] max-w-2xl mx-auto">
+    <div className="mx-auto flex h-[calc(100dvh-7.5rem)] max-w-3xl flex-col overflow-hidden rounded-xl border bg-card shadow-xs md:h-[calc(100dvh-4rem)]">
       <AutoRefresh intervalMs={5000} />
       {/* Header */}
-      <div className="flex items-center gap-3 pb-4 border-b shrink-0">
+      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b px-4 py-3">
         <Link
           href="/dashboard/conversations"
           className="text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -43,14 +37,12 @@ export default async function ConversationDetailPage({
           <p className="font-semibold truncate">
             {conversation.contactName ?? conversation.contactWaId}
           </p>
-          <p className="text-xs text-muted-foreground">{conversation.contactWaId}</p>
+          <p className="text-xs text-muted-foreground" dir="ltr">+{conversation.contactWaId}</p>
         </div>
-        <Badge
-          className={statusColor[conversation.status] ?? "bg-gray-100 text-gray-800"}
-          variant="outline"
-        >
-          {t.conversations.status[conversation.status as keyof typeof t.conversations.status] ?? conversation.status}
-        </Badge>
+        <StatusBadge
+          status={conversation.status}
+          label={t.conversations.status[conversation.status as keyof typeof t.conversations.status] ?? conversation.status}
+        />
         <StatusActions
           conversationId={conversation.id}
           status={conversation.status}
@@ -60,13 +52,13 @@ export default async function ConversationDetailPage({
       </div>
 
       {conversation.aiPaused && conversation.status !== "resolved" && (
-        <div className="mt-3 rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-sm text-blue-800">
+        <div className="shrink-0 border-b bg-sky-50 px-4 py-2 text-sm text-sky-900">
           {t.conversations.detail.aiPausedNote}
         </div>
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto py-4 space-y-3">
+      <div className="flex-1 space-y-2 overflow-y-auto bg-[oklch(0.965_0.01_120)] px-4 py-4">
         <MessageList messages={messages} t={t.conversations.detail} locale={t.locale} />
       </div>
 

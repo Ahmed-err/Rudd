@@ -20,6 +20,11 @@ export const bookAppointmentSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
+export const rescheduleAppointmentSchema = z.object({
+  appointment_id: z.string().uuid().describe("ID from the customer's upcoming appointments list"),
+  new_start: z.string().describe("New start time exactly as returned by proposeSlots"),
+});
+
 export const cancelAppointmentSchema = z.object({
   appointment_id: z.string().uuid().describe("ID from the customer's upcoming appointments list"),
 });
@@ -77,6 +82,11 @@ export const TOOL_DEFINITIONS: OpenAI.Chat.ChatCompletionTool[] = [
     proposeSlotsSchema,
   ),
   tool("bookAppointment", "Book one of the times returned by proposeSlots", bookAppointmentSchema),
+  tool(
+    "rescheduleAppointment",
+    "Move one of this customer's upcoming appointments to a new time returned by proposeSlots",
+    rescheduleAppointmentSchema,
+  ),
   tool("cancelAppointment", "Cancel one of this customer's upcoming appointments", cancelAppointmentSchema),
   tool("captureLead", "Save contact information and qualification data", captureLeadSchema),
   tool("escalateToHuman", "Hand the conversation to a human; the AI stops replying afterwards", escalateToHumanSchema),

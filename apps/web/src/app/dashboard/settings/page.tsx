@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import { getSessionTenant } from "@/lib/session";
 import { getT } from "@/lib/i18n/server";
 import { getAgentSettings, hasGoogleConnected, getWhatsAppAccount } from "@/features/settings/queries";
@@ -5,6 +6,7 @@ import { AgentSettingsForm } from "@/features/settings/agent-settings-form";
 import { ServicesEditor } from "@/features/settings/services-editor";
 import { WorkingHoursEditor } from "@/features/settings/working-hours-editor";
 import { WhatsAppSetup } from "@/features/settings/whatsapp-setup";
+import { ReminderSettingsForm } from "@/features/settings/reminder-settings-form";
 import { Button } from "@/components/ui/button";
 import { parseServices } from "@rudd/shared";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,8 +29,8 @@ export default async function SettingsPage({
   const services = parseServices(settings?.services);
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <h1 className="text-2xl font-semibold">{t.settings.title}</h1>
+    <div className="space-y-6 max-w-3xl">
+      <PageHeader title={t.settings.title} description={t.settings.subtitle} />
 
       {success === "google_connected" && (
         <div className="rounded-md bg-green-50 border border-green-200 px-4 py-2 text-sm text-green-800">
@@ -46,6 +48,7 @@ export default async function SettingsPage({
           <TabsTrigger value="agent">{t.settings.tabs.agent}</TabsTrigger>
           <TabsTrigger value="services">{t.settings.tabs.services}</TabsTrigger>
           <TabsTrigger value="hours">{t.settings.tabs.hours}</TabsTrigger>
+          <TabsTrigger value="reminders">{t.settings.tabs.reminders}</TabsTrigger>
           <TabsTrigger value="integrations">{t.settings.tabs.integrations}</TabsTrigger>
         </TabsList>
 
@@ -81,6 +84,26 @@ export default async function SettingsPage({
             </CardHeader>
             <CardContent>
               <WorkingHoursEditor initial={settings?.workingHours} t={t.settings.hours} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reminders" className="pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t.settings.reminders.title}</CardTitle>
+              <CardDescription>{t.settings.reminders.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ReminderSettingsForm
+                initial={{
+                  enabled: settings?.remindersEnabled ?? false,
+                  hoursBefore: settings?.reminderHoursBefore ?? 24,
+                  templateName: settings?.reminderTemplateName ?? null,
+                  templateLanguage: settings?.reminderTemplateLanguage ?? "en",
+                }}
+                t={t.settings.reminders}
+              />
             </CardContent>
           </Card>
         </TabsContent>

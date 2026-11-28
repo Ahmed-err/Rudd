@@ -4,8 +4,9 @@ import { getT } from "@/lib/i18n/server";
 import { listConversations, countConversations, PAGE_SIZE } from "@/features/conversations/queries";
 import { AutoRefresh } from "@/features/conversations/auto-refresh";
 import { Pagination } from "@/components/pagination";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MessagesSquare, X } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
+import { StatusBadge } from "@/components/status-badge";
 import { cn } from "@/lib/utils";
 
 const FILTERS = ["all", "active", "escalated", "resolved"] as const;
@@ -30,36 +31,34 @@ export default async function ConversationsPage({
     countConversations(tenantId, statusFilter, waId),
   ]);
 
-  const statusColor: Record<string, string> = {
-    active: "bg-green-100 text-green-800",
-    resolved: "bg-gray-100 text-gray-800",
-    escalated: "bg-red-100 text-red-800",
-  };
+  const initials = (name: string | null) =>
+    name?.trim() ? name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase() : "#";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <AutoRefresh intervalMs={10000} />
-      <h1 className="text-2xl font-semibold">{t.conversations.title}</h1>
+      <PageHeader title={t.conversations.title} description={t.conversations.subtitle} />
 
-      {/* Contact filter banner */}
       {waId && (
-        <div className="flex items-center gap-2 text-sm bg-muted px-3 py-2 rounded-md">
-          <span className="text-muted-foreground">{t.conversations.filteringBy} <strong>{waId}</strong></span>
-          <Link href="/dashboard/conversations" className="text-primary hover:underline text-xs">✕</Link>
+        <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
+          <span className="text-muted-foreground">
+            {t.conversations.filteringBy} <strong dir="ltr">{waId}</strong>
+          </span>
+          <Link href="/dashboard/conversations" className="ms-auto rounded p-1 hover:bg-background" aria-label="Clear filter">
+            <X className="size-3.5" aria-hidden />
+          </Link>
         </div>
       )}
 
-      {/* Filter tabs */}
-      <div className="flex gap-1 flex-wrap">
+      <div className="inline-flex flex-wrap gap-1 rounded-lg border bg-card p-1">
         {FILTERS.map((f) => (
           <Link
             key={f}
             href={f === "all" ? "/dashboard/conversations" : `/dashboard/conversations?status=${f}`}
+            aria-current={activeFilter === f ? "page" : undefined}
             className={cn(
-              "px-3 py-1.5 rounded-md text-sm transition-colors",
-              activeFilter === f
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:text-foreground",
+              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              activeFilter === f ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground",
             )}
           >
             {t.conversations.filter[f as keyof typeof t.conversations.filter]}
@@ -68,44 +67,61 @@ export default async function ConversationsPage({
       </div>
 
       {conversations.length === 0 && page === 0 ? (
-        <p className="text-muted-foreground text-sm">{t.conversations.empty}</p>
+        <div className="rounded-xl border border-dashed bg-card px-6 py-14 text-center">
+          <MessagesSquare className="mx-auto size-8 text-muted-foreground" aria-hidden />
+          <p className="mt-3 text-sm text-muted-foreground">{t.conversations.empty}</p>
+        </div>
       ) : (
-        <div className="grid gap-3">
+        <ul className="divide-y overflow-hidden rounded-xl border bg-card shadow-xs">
           {conversations.map((c) => {
             const hasUnread = c.lastMessageDirection === "inbound";
             return (
-            <Link key={c.id} href={`/dashboard/conversations/${c.id}`}>
-              <Card className={cn("hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer", hasUnread && "border-primary/40 bg-primary/5")}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {hasUnread && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
-                      <CardTitle className={cn("text-base truncate", hasUnread && "font-bold")}>
-                        {c.contactName ?? c.contactWaId}
-                      </CardTitle>
+              <li key={c.id}>
+                <Link
+                  href={`/dashboard/conversations/${c.id}`}
+                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/60"
+                >
+                  <span
+                    className={cn(
+                      "grid size-10 shrink-0 place-items-center rounded-full text-sm font-semibold",
+                      hasUnread ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground",
+                    )}
+                    aria-hidden
+                  >
+                    {initials(c.contactName)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className={cn("truncate text-sm", hasUnread ? "font-semibold" : "font-medium")}>
+                        {c.contactName ?? <span dir="ltr">+{c.contactWaId}</span>}
+                      </p>
+                      {hasUnread && <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />}
                     </div>
-                    <Badge
-                      className={statusColor[c.status] ?? "bg-gray-100 text-gray-800"}
-                      variant="outline"
-                    >
-                      {t.conversations.status[c.status as keyof typeof t.conversations.status] ?? c.status}
-                    </Badge>
+                    <p className={cn("truncate text-sm", hasUnread ? "text-foreground" : "text-muted-foreground")}>
+                      {c.lastMessage ?? "—"}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {c.contactWaId} ·{" "}
-                    {c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleString(t.locale) : "—"}
-                  </p>
-                </CardHeader>
-                {c.lastMessage && (
-                  <CardContent className="pt-0">
-                    <p className="text-sm text-muted-foreground line-clamp-1">{c.lastMessage}</p>
-                  </CardContent>
-                )}
-              </Card>
-            </Link>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <span className="text-xs tabular-nums text-muted-foreground">
+                      {c.lastMessageAt
+                        ? new Date(c.lastMessageAt).toLocaleString(t.locale, {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "—"}
+                    </span>
+                    <StatusBadge
+                      status={c.status}
+                      label={t.conversations.status[c.status as keyof typeof t.conversations.status] ?? c.status}
+                    />
+                  </div>
+                </Link>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
 
       <Pagination

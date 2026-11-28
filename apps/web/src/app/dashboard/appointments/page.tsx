@@ -1,9 +1,13 @@
+import { PageHeader } from "@/components/page-header";
 import { getSessionTenant } from "@/lib/session";
 import { getT } from "@/lib/i18n/server";
 import { listAppointments, countAppointments, APPOINTMENTS_PAGE_SIZE } from "@/features/appointments/queries";
 import { CancelButton } from "@/features/appointments/cancel-button";
 import { Pagination } from "@/components/pagination";
-import { Badge } from "@/components/ui/badge";
+import { CalendarDays } from "lucide-react";
+import { StatusBadge } from "@/components/status-badge";
+import { getAgentSettings } from "@/features/settings/queries";
+import { parseServices } from "@rudd/shared";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default async function AppointmentsPage({
@@ -17,25 +21,28 @@ export default async function AppointmentsPage({
     searchParams,
   ]);
   const page = Math.max(0, Number(pageParam ?? 0));
-  const [appts, total] = await Promise.all([
+  const [appts, total, settings] = await Promise.all([
     listAppointments(tenantId, page),
     countAppointments(tenantId),
+    getAgentSettings(tenantId),
   ]);
-
-  const statusColor: Record<string, string> = {
-    scheduled: "bg-blue-100 text-blue-800",
-    completed: "bg-green-100 text-green-800",
-    cancelled: "bg-red-100 text-red-800",
-  };
+  const timeZone = settings?.timezone ?? "UTC";
+  const services = parseServices(settings?.services);
+  const serviceName = (id: string | null) => services.find((s) => s.id === id)?.name ?? id ?? "—";
+  const fmtDate = new Intl.DateTimeFormat(t.locale, { timeZone, weekday: "short", day: "numeric", month: "short" });
+  const fmtTime = new Intl.DateTimeFormat(t.locale, { timeZone, hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">{t.appointments.title}</h1>
+    <div className="space-y-6">
+      <PageHeader title={t.appointments.title} description={t.appointments.subtitle} />
       {appts.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t.appointments.empty}</p>
+        <div className="rounded-xl border border-dashed bg-card px-6 py-14 text-center">
+          <CalendarDays className="mx-auto size-8 text-muted-foreground" aria-hidden />
+          <p className="mt-3 text-sm text-muted-foreground">{t.appointments.empty}</p>
+        </div>
       ) : (
-        <div className="rounded-md border">
-          <Table className="table-fixed w-full">
+        <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
+          <Table className="min-w-[44rem] table-fixed">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-36">{t.appointments.columns.customer}</TableHead>
@@ -49,19 +56,24 @@ export default async function AppointmentsPage({
             <TableBody>
               {appts.map((a) => (
                 <TableRow key={a.id}>
-                  <TableCell className="font-medium truncate">{a.contactName ?? a.contactWaId}</TableCell>
-                  <TableCell className="truncate">{a.serviceId ?? "—"}</TableCell>
-                  <TableCell className="text-sm">
-                    {new Date(a.startAt).toLocaleString(t.locale)} – {new Date(a.endAt).toLocaleTimeString(t.locale)}
+                  <TableCell className="font-medium truncate">{a.contactName ?? `+${a.contactWaId}`}</TableCell>
+                  <TableCell className="truncate">{serviceName(a.serviceId)}</TableCell>
+                  <TableCell className="text-sm tabular-nums">
+                    <span className="font-medium">{fmtDate.format(a.startAt)}</span>
+                    <span className="text-muted-foreground">
+                      {" · "}
+                      {fmtTime.format(a.startAt)}–{fmtTime.format(a.endAt)}
+                    </span>
                   </TableCell>
                   <TableCell>
-                    <Badge className={statusColor[a.status] ?? "bg-gray-100 text-gray-800"} variant="outline">
-                      {t.appointments.status[a.status as keyof typeof t.appointments.status] ?? a.status}
-                    </Badge>
+                    <StatusBadge
+                      status={a.status}
+                      label={t.appointments.status[a.status as keyof typeof t.appointments.status] ?? a.status}
+                    />
                   </TableCell>
                   <TableCell>
                     {a.gcalEventId
-                      ? <span className="text-xs text-green-600">{t.appointments.synced}</span>
+                      ? <span className="text-xs text-emerald-700">{t.appointments.synced}</span>
                       : <span className="text-xs text-muted-foreground">{t.appointments.notSynced}</span>}
                   </TableCell>
                   <TableCell className="">
@@ -79,8 +91,10 @@ export default async function AppointmentsPage({
               ))}
             </TableBody>
           </Table>
-        <Pagination page={page} total={total} pageSize={APPOINTMENTS_PAGE_SIZE} searchParams={{}} />
         </div>
+      )}
+      {appts.length > 0 && (
+        <Pagination page={page} total={total} pageSize={APPOINTMENTS_PAGE_SIZE} searchParams={{}} />
       )}
     </div>
   );

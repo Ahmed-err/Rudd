@@ -19,10 +19,61 @@ export const translations = {
       tagline: "WhatsApp AI Appointment Agent",
       signIn: "Sign In",
       createAccount: "Create Account",
+      eyebrow: "AI receptionist for WhatsApp",
+      headline: "Your WhatsApp books appointments while you work",
+      subhead: "Rudd replies to customers in their own language, offers real free times from your calendar, books, reschedules and sends reminders — and hands the chat to you when it matters.",
+      primaryCta: "Start free",
+      secondaryCta: "Sign in",
+      trust: "Built on the official WhatsApp Business Cloud API and Google Calendar",
+      featuresTitle: "Everything a front desk does, on WhatsApp",
+      featuresSubtitle: "Set your services and hours once. Rudd handles the conversations.",
+      features: [
+        { title: "Real availability", body: "Only offers times that fit your working hours, existing bookings and Google Calendar." },
+        { title: "Arabic and English", body: "Mirrors each customer's language and dialect, from Egyptian to Gulf Arabic." },
+        { title: "Book, move, cancel", body: "Customers manage their own appointments in the chat, with your calendar kept in sync." },
+        { title: "Reminders that cut no-shows", body: "Automatic WhatsApp reminders before every appointment." },
+        { title: "Human handoff", body: "Escalates when needed and goes quiet the moment you reply yourself." },
+        { title: "Voice notes understood", body: "Transcribes voice messages so customers can talk instead of type." },
+      ],
+      stepsTitle: "Live in three steps",
+      steps: [
+        { title: "Add your services and hours", body: "Tell Rudd what you offer, how long it takes and when you're open." },
+        { title: "Connect WhatsApp and Calendar", body: "Paste your WhatsApp Cloud API details and sign in with Google." },
+        { title: "Let customers message you", body: "Rudd answers instantly, day and night, and you watch it all from the dashboard." },
+      ],
+      ctaTitle: "Stop losing bookings to slow replies",
+      ctaBody: "Customers who wait move on. Rudd answers in seconds.",
+      privacy: "Privacy Policy",
+      chat: {
+        title: "Glow Clinic",
+        status: "online",
+        customer1: "Hi, can I book a consultation tomorrow?",
+        bot1: "Of course! Tomorrow I have 10:00, 12:30 or 15:00 free. Which suits you?",
+        customer2: "12:30 please",
+        bot2: "You're booked for a consultation tomorrow at 12:30. I'll send you a reminder the day before.",
+        booked: "Appointment booked",
+      },
     },
 
     dashboard: {
       title: "Dashboard",
+      subtitle: "How your WhatsApp assistant is doing.",
+      last30: "Last 30 days",
+      bookings30d: "Bookings",
+      cancellations30d: "Cancellations",
+      conversations30d: "New conversations",
+      messagesSent30d: "Messages sent",
+      upcoming: "Upcoming appointments",
+      needsAttention: "Needs attention",
+      chartTitle: "Bookings, last 14 days",
+      chartTotal: "{n} bookings",
+      bookingsOn: "{n} on {date}",
+      nextAppointments: "Next appointments",
+      noUpcoming: "No upcoming appointments.",
+      attentionTitle: "Waiting for you",
+      attentionEmpty: "Nothing needs you right now. The assistant is handling it.",
+      aiPaused: "AI paused",
+      viewAll: "View all",
       activeConversations: "Active Conversations",
       escalated: "Escalated",
       upcomingAppointments: "Upcoming Appointments",
@@ -34,10 +85,11 @@ export const translations = {
 
     conversations: {
       title: "Conversations",
+      subtitle: "Every WhatsApp chat, handled by AI or by you.",
       empty: "No conversations yet.",
       filter: { all: "All", active: "Active", resolved: "Resolved", escalated: "Escalated" },
       filteringBy: "Showing conversations for:",
-      status: { active: "active", resolved: "resolved", escalated: "escalated" },
+      status: { active: "Active", resolved: "Resolved", escalated: "Escalated" },
       detail: {
         back: "← Back",
         noMessages: "No messages yet.",
@@ -64,6 +116,7 @@ export const translations = {
 
     appointments: {
       title: "Appointments",
+      subtitle: "Bookings made through WhatsApp and the dashboard.",
       empty: "No appointments yet.",
       columns: {
         customer: "Customer",
@@ -79,12 +132,13 @@ export const translations = {
       cancelling: "Cancelling...",
       confirmCancel: "Cancel this appointment? The customer will be notified on WhatsApp if possible.",
       notNotified: "Appointment cancelled, but the customer could not be notified on WhatsApp (likely outside the 24-hour window). Please contact them directly.",
-      status: { scheduled: "scheduled", completed: "completed", cancelled: "cancelled" },
+      status: { scheduled: "Scheduled", completed: "Completed", cancelled: "Cancelled" },
     },
 
     settings: {
       title: "Settings",
-      tabs: { agent: "Agent", services: "Services", hours: "Hours", integrations: "Integrations" },
+      subtitle: "Services, hours, reminders and integrations.",
+      tabs: { agent: "Agent", services: "Services", hours: "Hours", reminders: "Reminders", integrations: "Integrations" },
       agent: {
         title: "AI Agent Settings",
         description: "Configure how the agent presents itself to customers.",
@@ -108,6 +162,20 @@ export const translations = {
         save: "Save Services",
         saving: "Saving...",
         durationUnit: "min",
+      },
+      reminders: {
+        title: "Appointment Reminders",
+        description: "Send customers a WhatsApp reminder before their appointment to cut no-shows.",
+        enable: "Send reminders",
+        enableHint: "Checked every 15 minutes. Customers who book after the reminder time aren't reminded.",
+        hoursBefore: "Hours before the appointment",
+        templateName: "WhatsApp template name",
+        templateLanguage: "Language",
+        templateHelpTitle: "Why a template?",
+        templateHelp: "WhatsApp only allows free-form messages within 24 hours of the customer's last message. Outside that window, reminders are sent with an approved template. Create one in Meta Business Manager (category: Utility) with three variables: customer name, business name, date and time. Without a template, reminders only go to customers who wrote in the last 24 hours.",
+        save: "Save Reminders",
+        saving: "Saving...",
+        saved: "Saved",
       },
       hours: {
         title: "Working Hours",
@@ -171,6 +239,7 @@ export const translations = {
 
     contacts: {
       title: "Contacts",
+      subtitle: "Everyone who has messaged your business.",
       empty: "No contacts yet.",
       columns: {
         name: "Name",
@@ -208,10 +277,61 @@ export const translations = {
       tagline: "وكيل الذكاء الاصطناعي لحجز المواعيد عبر واتساب",
       signIn: "تسجيل الدخول",
       createAccount: "إنشاء حساب",
+      eyebrow: "موظف استقبال ذكي على واتساب",
+      headline: "واتساب يحجز مواعيدك وأنت مشغول بعملك",
+      subhead: "يرد «رد» على عملائك بلغتهم، ويعرض المواعيد المتاحة فعلاً من تقويمك، ويحجز ويغيّر المواعيد ويرسل التذكيرات — ويحوّل المحادثة إليك عند الحاجة.",
+      primaryCta: "ابدأ مجاناً",
+      secondaryCta: "تسجيل الدخول",
+      trust: "مبني على واجهة WhatsApp Business Cloud الرسمية وتقويم جوجل",
+      featuresTitle: "كل ما يفعله موظف الاستقبال، على واتساب",
+      featuresSubtitle: "حدد خدماتك وساعات عملك مرة واحدة، و«رد» يتولى المحادثات.",
+      features: [
+        { title: "مواعيد متاحة فعلاً", body: "لا يعرض إلا الأوقات المناسبة لساعات عملك وحجوزاتك وتقويم جوجل." },
+        { title: "عربي وإنجليزي", body: "يتحدث بلغة كل عميل ولهجته، من المصرية إلى الخليجية." },
+        { title: "حجز وتغيير وإلغاء", body: "يدير العملاء مواعيدهم بأنفسهم داخل المحادثة مع مزامنة تقويمك." },
+        { title: "تذكيرات تقلل الغياب", body: "تذكير تلقائي عبر واتساب قبل كل موعد." },
+        { title: "تحويل للموظف", body: "يحوّل المحادثة عند الحاجة ويتوقف فور ردك بنفسك." },
+        { title: "يفهم الرسائل الصوتية", body: "يحوّل الرسائل الصوتية إلى نص ليتحدث العملاء بدلاً من الكتابة." },
+      ],
+      stepsTitle: "جاهز في ثلاث خطوات",
+      steps: [
+        { title: "أضف خدماتك وساعات العمل", body: "أخبر «رد» بما تقدمه ومدته ومواعيد عملك." },
+        { title: "اربط واتساب والتقويم", body: "أدخل بيانات WhatsApp Cloud API وسجّل الدخول بحساب جوجل." },
+        { title: "دع العملاء يراسلونك", body: "يرد «رد» فوراً ليلاً ونهاراً، وتتابع كل شيء من لوحة التحكم." },
+      ],
+      ctaTitle: "لا تخسر الحجوزات بسبب تأخر الرد",
+      ctaBody: "العميل الذي ينتظر يذهب لغيرك. «رد» يجيب خلال ثوانٍ.",
+      privacy: "سياسة الخصوصية",
+      chat: {
+        title: "عيادة جلو",
+        status: "متصل",
+        customer1: "مرحباً، أقدر أحجز استشارة بكرة؟",
+        bot1: "أكيد! بكرة متاح الساعة 10:00 أو 12:30 أو 3:00. أي وقت يناسبك؟",
+        customer2: "12:30 لو سمحت",
+        bot2: "تم حجز استشارتك بكرة الساعة 12:30. هبعتلك تذكير قبلها بيوم.",
+        booked: "تم حجز الموعد",
+      },
     },
 
     dashboard: {
       title: "لوحة التحكم",
+      subtitle: "أداء مساعد واتساب الخاص بك.",
+      last30: "آخر 30 يوماً",
+      bookings30d: "الحجوزات",
+      cancellations30d: "الإلغاءات",
+      conversations30d: "محادثات جديدة",
+      messagesSent30d: "الرسائل المرسلة",
+      upcoming: "المواعيد القادمة",
+      needsAttention: "تحتاج متابعتك",
+      chartTitle: "الحجوزات خلال آخر 14 يوماً",
+      chartTotal: "{n} حجز",
+      bookingsOn: "{n} في {date}",
+      nextAppointments: "المواعيد القادمة",
+      noUpcoming: "لا توجد مواعيد قادمة.",
+      attentionTitle: "بانتظارك",
+      attentionEmpty: "لا شيء يحتاجك الآن. المساعد يتولى الأمر.",
+      aiPaused: "الرد الآلي متوقف",
+      viewAll: "عرض الكل",
       activeConversations: "المحادثات النشطة",
       escalated: "المصعّدة",
       upcomingAppointments: "المواعيد القادمة",
@@ -223,6 +343,7 @@ export const translations = {
 
     conversations: {
       title: "المحادثات",
+      subtitle: "كل محادثات واتساب، يتولاها الذكاء الاصطناعي أو أنت.",
       empty: "لا توجد محادثات بعد.",
       filter: { all: "الكل", active: "نشطة", resolved: "محلولة", escalated: "مُحوَّلة" },
       filteringBy: "عرض محادثات:",
@@ -253,6 +374,7 @@ export const translations = {
 
     appointments: {
       title: "المواعيد",
+      subtitle: "الحجوزات التي تمت عبر واتساب ولوحة التحكم.",
       empty: "لا توجد مواعيد بعد.",
       columns: {
         customer: "العميل",
@@ -273,7 +395,8 @@ export const translations = {
 
     settings: {
       title: "الإعدادات",
-      tabs: { agent: "الوكيل", services: "الخدمات", hours: "ساعات العمل", integrations: "التكاملات" },
+      subtitle: "الخدمات والساعات والتذكيرات والتكاملات.",
+      tabs: { agent: "الوكيل", services: "الخدمات", hours: "ساعات العمل", reminders: "التذكيرات", integrations: "التكاملات" },
       agent: {
         title: "إعدادات وكيل الذكاء الاصطناعي",
         description: "اضبط طريقة تقديم الوكيل لنفسه للعملاء.",
@@ -297,6 +420,20 @@ export const translations = {
         save: "حفظ الخدمات",
         saving: "جار الحفظ...",
         durationUnit: "دقيقة",
+      },
+      reminders: {
+        title: "تذكير المواعيد",
+        description: "أرسل للعملاء تذكيراً عبر واتساب قبل موعدهم لتقليل الغياب.",
+        enable: "إرسال التذكيرات",
+        enableHint: "يتم الفحص كل 15 دقيقة. لا يُرسل تذكير لمن يحجز بعد وقت التذكير.",
+        hoursBefore: "عدد الساعات قبل الموعد",
+        templateName: "اسم قالب واتساب",
+        templateLanguage: "اللغة",
+        templateHelpTitle: "لماذا القالب؟",
+        templateHelp: "يسمح واتساب بالرسائل الحرة فقط خلال 24 ساعة من آخر رسالة للعميل. خارج هذه المدة تُرسل التذكيرات بقالب معتمد. أنشئ قالباً في Meta Business Manager (فئة: Utility) بثلاثة متغيرات: اسم العميل، اسم النشاط، التاريخ والوقت. بدون قالب، تصل التذكيرات فقط لمن راسلك خلال آخر 24 ساعة.",
+        save: "حفظ التذكيرات",
+        saving: "جار الحفظ...",
+        saved: "تم الحفظ",
       },
       hours: {
         title: "ساعات العمل",
@@ -360,6 +497,7 @@ export const translations = {
 
     contacts: {
       title: "جهات الاتصال",
+      subtitle: "كل من راسل نشاطك التجاري.",
       empty: "لا توجد جهات اتصال بعد.",
       columns: {
         name: "الاسم",

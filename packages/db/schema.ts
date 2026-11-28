@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, timestamp, uuid, jsonb, varchar, uniqueIndex, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, jsonb, varchar, uniqueIndex, boolean, index, integer } from "drizzle-orm/pg-core";
 
 // ── Tenants (mirrors Clerk Organizations) ─────────────────────────────────────
 export const tenants = pgTable("tenants", {
@@ -44,6 +44,11 @@ export const agentSettings = pgTable("agent_settings", {
   services: jsonb("services").notNull().default([]),
   systemPromptOverride: text("system_prompt_override"),
   notificationEmail: text("notification_email"),
+  remindersEnabled: boolean("reminders_enabled").notNull().default(false),
+  reminderHoursBefore: integer("reminder_hours_before").notNull().default(24),
+  // Approved WhatsApp template used when the 24h customer-service window is closed.
+  reminderTemplateName: text("reminder_template_name"),
+  reminderTemplateLanguage: varchar("reminder_template_language", { length: 15 }).notNull().default("en"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -98,6 +103,7 @@ export const appointments = pgTable("appointments", {
   endAt: timestamp("end_at").notNull(),
   status: varchar("status", { length: 64 }).notNull().default("scheduled"), // scheduled | completed | cancelled
   notes: text("notes"),
+  reminderSentAt: timestamp("reminder_sent_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => [
