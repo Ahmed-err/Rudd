@@ -15,6 +15,13 @@
       "when": 1777195621667,
       "tag": "0001_lean_lady_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795813907588,
+      "tag": "0002_hardening",
+      "breakpoints": true
     }
   ]
 }

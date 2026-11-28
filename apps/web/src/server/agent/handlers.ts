@@ -1,249 +1,294 @@
 import "server-only";
-import { db, agentSettings, appointments, contacts, conversations } from "@rudd/db";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { db, appointments, contacts, conversations, tenants, agentSettings, withTenant } from "@rudd/db";
+import { and, eq } from "drizzle-orm";
+import type { Service, WorkingHours } from "@rudd/shared";
 import {
   bookAppointmentSchema,
   cancelAppointmentSchema,
   captureLeadSchema,
   escalateToHumanSchema,
-  getAvailabilitySchema,
   proposeSlotsSchema,
 } from "./tools";
 import {
-  getFreeBusy,
-  createCalendarEvent,
-  deleteCalendarEvent,
-} from "@/server/calendar/client";
+  MAX_RANGE_DAYS,
+  addDays,
+  formatLocalIso,
+  generateSlots,
+  isWithinWorkingHours,
+  overlaps,
+  parseDateTime,
+  toLocalParts,
+  zonedToUtc,
+} from "./availability";
+import { cancelAppointmentForTenant, getBusyIntervals } from "@/server/appointments";
+import { createCalendarEvent } from "@/server/calendar/client";
+import { sendEscalationEmail } from "@/server/notifications";
 
-type HandlerContext = {
+export type HandlerContext = {
   tenantId: string;
   conversationId: string;
   contactId: string;
+  timeZone: string;
+  workingHours: WorkingHours;
+  services: Service[];
+  now: Date;
 };
 
-// ── list_services ──────────────────────────────────────────────────────────────
-export const handleListServices = async (
-  _args: unknown,
-  { tenantId }: HandlerContext,
-): Promise<string> => {
-  const [settings] = await db
-    .select({ services: agentSettings.services })
-    .from(agentSettings)
-    .where(eq(agentSettings.tenantId, tenantId))
-    .limit(1);
+const DEFAULT_DURATION_MINUTES = 60;
 
-  const services = settings?.services as Array<{ id: string; name: string; duration_minutes: number; price?: string }> ?? [];
-  if (!services.length) return "No services configured yet.";
-  return JSON.stringify(services);
+const json = (value: unknown): string => JSON.stringify(value);
+
+const resolveService = (ctx: HandlerContext, serviceId: string): Service | null => {
+  const found = ctx.services.find((s) => s.id === serviceId);
+  if (found) return found;
+  // A business with no services configured still gets a generic booking.
+  if (!ctx.services.length) return { id: serviceId || "general", name: "Appointment", duration_minutes: DEFAULT_DURATION_MINUTES };
+  return null;
 };
 
-// ── get_availability ───────────────────────────────────────────────────────────
-export const handleGetAvailability = async (
-  rawArgs: unknown,
-  { tenantId }: HandlerContext,
-): Promise<string> => {
-  const args = getAvailabilitySchema.parse(rawArgs);
+const unknownService = (ctx: HandlerContext): string =>
+  json({ error: "unknown_service_id", valid_service_ids: ctx.services.map((s) => s.id) });
 
-  const [settings] = await db
-    .select({ workingHours: agentSettings.workingHours, timezone: agentSettings.timezone })
-    .from(agentSettings)
-    .where(eq(agentSettings.tenantId, tenantId))
-    .limit(1);
-
-  const timeMin = `${args.date_from}T00:00:00Z`;
-  const timeMax = `${args.date_to}T23:59:59Z`;
-
-  let busySlots: Array<{ start: string; end: string }> = [];
-  try {
-    busySlots = await getFreeBusy(tenantId, timeMin, timeMax);
-  } catch {
-    // Fall back to DB-only availability if calendar not yet connected
-    const booked = await db
-      .select({ startAt: appointments.startAt, endAt: appointments.endAt })
-      .from(appointments)
-      .where(
-        and(
-          eq(appointments.tenantId, tenantId),
-          gte(appointments.startAt, new Date(timeMin)),
-          lte(appointments.endAt, new Date(timeMax)),
-        ),
-      );
-    busySlots = booked.map((b) => ({ start: b.startAt.toISOString(), end: b.endAt.toISOString() }));
-  }
-
-  return JSON.stringify({
-    busy_slots: busySlots,
-    working_hours: settings?.workingHours ?? {},
-    timezone: settings?.timezone ?? "UTC",
-    date_range: { from: args.date_from, to: args.date_to },
+const findSlots = async (
+  ctx: HandlerContext,
+  service: Service,
+  dateFrom: string,
+  dateTo: string,
+  count: number,
+) => {
+  const from = zonedToUtc(dateFrom, "00:00", ctx.timeZone);
+  const to = zonedToUtc(addDays(dateTo, 1), "00:00", ctx.timeZone);
+  const busy = await getBusyIntervals(ctx.tenantId, from, to);
+  return generateSlots({
+    workingHours: ctx.workingHours,
+    timeZone: ctx.timeZone,
+    dateFrom,
+    dateTo,
+    durationMinutes: service.duration_minutes,
+    busy,
+    now: ctx.now,
+    count,
   });
 };
 
-// ── propose_slots ──────────────────────────────────────────────────────────────
-export const handleProposeSlots = async (
-  rawArgs: unknown,
-  { tenantId: _tenantId }: HandlerContext,
-): Promise<string> => {
-  const args = proposeSlotsSchema.parse(rawArgs);
+const describeSlots = (ctx: HandlerContext, slots: Array<{ start: Date }>) =>
+  slots.map((s) => ({
+    start: formatLocalIso(s.start, ctx.timeZone),
+    label: new Intl.DateTimeFormat("en-GB", {
+      timeZone: ctx.timeZone,
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(s.start),
+  }));
 
-  // Simple slot generation: return `count` slots starting from date_from at 9am, spaced 1 day apart
-  // The agent will format these nicely for the user
-  const slots = [];
-  const start = new Date(`${args.date_from}T09:00:00`);
-  for (let i = 0; i < args.count; i++) {
-    const slotStart = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
-    const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000);
-    slots.push({ start: slotStart.toISOString(), end: slotEnd.toISOString() });
+export const handleListServices = async (_args: unknown, ctx: HandlerContext): Promise<string> =>
+  ctx.services.length ? json(ctx.services) : "No services configured yet.";
+
+export const handleProposeSlots = async (rawArgs: unknown, ctx: HandlerContext): Promise<string> => {
+  const args = proposeSlotsSchema.parse(rawArgs);
+  const service = resolveService(ctx, args.service_id);
+  if (!service) return unknownService(ctx);
+
+  const today = toLocalParts(ctx.now, ctx.timeZone).date;
+  const dateFrom = args.date_from < today ? today : args.date_from;
+  const maxTo = addDays(dateFrom, MAX_RANGE_DAYS - 1);
+  const dateTo = args.date_to > maxTo ? maxTo : args.date_to < dateFrom ? dateFrom : args.date_to;
+
+  let slots = await findSlots(ctx, service, dateFrom, dateTo, args.count);
+  let searchedUntil = dateTo;
+  if (!slots.length) {
+    // Nothing in the requested window; look a week further so the customer still gets options.
+    const extendedTo = addDays(dateTo, 7);
+    slots = await findSlots(ctx, service, addDays(dateTo, 1), extendedTo, args.count);
+    searchedUntil = extendedTo;
   }
 
-  return JSON.stringify({ proposed_slots: slots, service_id: args.service_id });
+  return json({
+    service: { id: service.id, name: service.name, duration_minutes: service.duration_minutes },
+    timezone: ctx.timeZone,
+    searched: { from: dateFrom, to: searchedUntil },
+    slots: describeSlots(ctx, slots),
+    ...(slots.length ? {} : { note: "No free times in this period. Ask for another date range or escalate." }),
+  });
 };
 
-// ── book_appointment ───────────────────────────────────────────────────────────
-export const handleBookAppointment = async (
-  rawArgs: unknown,
-  { tenantId, contactId }: HandlerContext,
-): Promise<string> => {
+const isUniqueViolation = (err: unknown): boolean => {
+  for (let e: unknown = err; e && typeof e === "object"; e = (e as { cause?: unknown }).cause) {
+    if ((e as { code?: unknown }).code === "23505") return true;
+  }
+  return false;
+};
+
+export const handleBookAppointment = async (rawArgs: unknown, ctx: HandlerContext): Promise<string> => {
   const args = bookAppointmentSchema.parse(rawArgs);
+  const service = resolveService(ctx, args.service_id);
+  if (!service) return unknownService(ctx);
 
-  const startAt = new Date(args.start_iso);
-  const endAt = new Date(startAt.getTime() + args.duration_minutes * 60 * 1000);
+  const startAt = parseDateTime(args.start, ctx.timeZone);
+  if (!startAt) return json({ error: "invalid_start", hint: "Use the exact `start` value returned by proposeSlots" });
+  const endAt = new Date(startAt.getTime() + service.duration_minutes * 60_000);
+  const slot = { start: startAt, end: endAt };
 
-  const [settings] = await db
-    .select({ businessName: agentSettings.businessName, timezone: agentSettings.timezone })
-    .from(agentSettings)
-    .where(eq(agentSettings.tenantId, tenantId))
-    .limit(1);
+  const alternatives = async (): Promise<unknown> => {
+    const day = toLocalParts(startAt, ctx.timeZone).date;
+    return describeSlots(ctx, await findSlots(ctx, service, day, addDays(day, 2), 3));
+  };
+
+  if (startAt <= ctx.now) return json({ success: false, reason: "time_in_past", alternatives: await alternatives() });
+  if (!isWithinWorkingHours(slot, ctx.workingHours, ctx.timeZone)) {
+    return json({ success: false, reason: "outside_working_hours", alternatives: await alternatives() });
+  }
+
+  const busy = await getBusyIntervals(ctx.tenantId, startAt, endAt);
+  if (busy.some((b) => overlaps(slot, b))) {
+    return json({ success: false, reason: "slot_taken", alternatives: await alternatives() });
+  }
+
+  let appointmentId: string | undefined;
+  try {
+    const [appt] = await db
+      .insert(appointments)
+      .values({
+        tenantId: ctx.tenantId,
+        contactId: ctx.contactId,
+        serviceId: service.id,
+        startAt,
+        endAt,
+        notes: args.notes,
+        status: "scheduled",
+      })
+      .returning({ id: appointments.id });
+    appointmentId = appt?.id;
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return json({ success: false, reason: "slot_taken", alternatives: await alternatives() });
+    }
+    throw err;
+  }
+  if (!appointmentId) throw new Error("Appointment insert returned no row");
 
   const [contact] = await db
-    .select({ name: contacts.name, email: contacts.email })
-    .from(contacts)
-    .where(and(eq(contacts.id, contactId), eq(contacts.tenantId, tenantId)))
-    .limit(1);
-
-  const [appt] = await db
-    .insert(appointments)
-    .values({
-      tenantId,
-      contactId,
-      serviceId: args.service_id,
-      startAt,
-      endAt,
-      notes: args.notes,
-      status: "scheduled",
+    .update(contacts)
+    .set({
+      ...(args.contact_name ? { name: args.contact_name } : {}),
+      leadStatus: "booked",
+      updatedAt: new Date(),
     })
-    .returning({ id: appointments.id });
+    .where(and(withTenant(ctx.tenantId, contacts.tenantId), eq(contacts.id, ctx.contactId)))
+    .returning({ name: contacts.name, email: contacts.email });
 
-  let gcalEventId: string | undefined;
+  let calendarSynced = false;
   try {
-    gcalEventId = await createCalendarEvent(tenantId, {
-      summary: `${args.service_id ?? "Appointment"} — ${contact?.name ?? "Customer"}`,
+    const gcalEventId = await createCalendarEvent(ctx.tenantId, {
+      summary: `${service.name} — ${contact?.name ?? "Customer"}`,
       ...(args.notes ? { description: args.notes } : {}),
       startIso: startAt.toISOString(),
       endIso: endAt.toISOString(),
-      timezone: settings?.timezone ?? "UTC",
+      timezone: ctx.timeZone,
       ...(contact?.email ? { attendeeEmail: contact.email } : {}),
     });
     await db
       .update(appointments)
       .set({ gcalEventId })
-      .where(eq(appointments.id, appt?.id ?? ""));
+      .where(and(withTenant(ctx.tenantId, appointments.tenantId), eq(appointments.id, appointmentId)));
+    calendarSynced = true;
   } catch (err) {
-    // Calendar not connected or failed — appointment still saved in DB
-    console.warn("[handlers] GCal createEvent skipped:", err);
+    console.warn("[handlers] calendar sync skipped:", err instanceof Error ? err.message : "unknown");
   }
 
-  return JSON.stringify({
+  return json({
     success: true,
-    appointment_id: appt?.id,
-    start: startAt.toISOString(),
-    end: endAt.toISOString(),
-    calendar_synced: !!gcalEventId,
+    appointment_id: appointmentId,
+    service: service.name,
+    start: formatLocalIso(startAt, ctx.timeZone),
+    end: formatLocalIso(endAt, ctx.timeZone),
+    calendar_synced: calendarSynced,
   });
 };
 
-// ── cancel_appointment ─────────────────────────────────────────────────────────
-export const handleCancelAppointment = async (
-  rawArgs: unknown,
-  { tenantId }: HandlerContext,
-): Promise<string> => {
+export const handleCancelAppointment = async (rawArgs: unknown, ctx: HandlerContext): Promise<string> => {
   const args = cancelAppointmentSchema.parse(rawArgs);
-
-  const [appt] = await db
-    .select({ gcalEventId: appointments.gcalEventId })
-    .from(appointments)
-    .where(and(eq(appointments.id, args.appointment_id), eq(appointments.tenantId, tenantId)))
-    .limit(1);
-
-  await db
-    .update(appointments)
-    .set({ status: "cancelled", updatedAt: new Date() })
-    .where(and(eq(appointments.id, args.appointment_id), eq(appointments.tenantId, tenantId)));
-
-  if (appt?.gcalEventId) {
-    try {
-      await deleteCalendarEvent(tenantId, appt.gcalEventId);
-    } catch (err) {
-      console.warn("[handlers] GCal deleteEvent failed:", err);
-    }
-  }
-
-  return JSON.stringify({ success: true, appointment_id: args.appointment_id });
+  const { cancelled } = await cancelAppointmentForTenant(ctx.tenantId, args.appointment_id, {
+    contactId: ctx.contactId,
+  });
+  return cancelled
+    ? json({ success: true, appointment_id: args.appointment_id })
+    : json({ success: false, reason: "not_found_or_already_cancelled" });
 };
 
-// ── capture_lead ───────────────────────────────────────────────────────────────
-export const handleCaptureLead = async (
-  rawArgs: unknown,
-  { tenantId, contactId }: HandlerContext,
-): Promise<string> => {
+export const handleCaptureLead = async (rawArgs: unknown, ctx: HandlerContext): Promise<string> => {
   const args = captureLeadSchema.parse(rawArgs);
+
+  const [existing] = await db
+    .select({ qualificationData: contacts.qualificationData, leadStatus: contacts.leadStatus })
+    .from(contacts)
+    .where(and(withTenant(ctx.tenantId, contacts.tenantId), eq(contacts.id, ctx.contactId)))
+    .limit(1);
 
   await db
     .update(contacts)
     .set({
       name: args.name,
-      email: args.email,
-      leadStatus: "qualified",
-      qualificationData: args.qualification_answers ?? {},
+      ...(args.email ? { email: args.email } : {}),
+      leadStatus: existing?.leadStatus === "booked" ? "booked" : "qualified",
+      qualificationData: {
+        ...((existing?.qualificationData as Record<string, unknown> | undefined) ?? {}),
+        ...(args.qualification_answers ?? {}),
+        intent: args.intent,
+      },
       updatedAt: new Date(),
     })
-    .where(and(eq(contacts.id, contactId), eq(contacts.tenantId, tenantId)));
+    .where(and(withTenant(ctx.tenantId, contacts.tenantId), eq(contacts.id, ctx.contactId)));
 
-  return JSON.stringify({ success: true });
+  return json({ success: true });
 };
 
-// ── escalate_to_human ──────────────────────────────────────────────────────────
-export const handleEscalateToHuman = async (
-  rawArgs: unknown,
-  { tenantId, conversationId }: HandlerContext,
-): Promise<string> => {
+export const handleEscalateToHuman = async (rawArgs: unknown, ctx: HandlerContext): Promise<string> => {
   const args = escalateToHumanSchema.parse(rawArgs);
 
   await db
     .update(conversations)
-    .set({ status: "escalated" })
-    .where(and(eq(conversations.id, conversationId), eq(conversations.tenantId, tenantId)));
+    .set({ status: "escalated", aiPaused: true })
+    .where(and(withTenant(ctx.tenantId, conversations.tenantId), eq(conversations.id, ctx.conversationId)));
 
-  // TODO: notify owner via email/push in next phase
+  const [row] = await db
+    .select({
+      contactName: contacts.name,
+      contactWaId: contacts.waId,
+      tenantName: tenants.name,
+      notificationEmail: agentSettings.notificationEmail,
+    })
+    .from(contacts)
+    .innerJoin(tenants, eq(tenants.id, contacts.tenantId))
+    .leftJoin(agentSettings, eq(agentSettings.tenantId, contacts.tenantId))
+    .where(and(withTenant(ctx.tenantId, contacts.tenantId), eq(contacts.id, ctx.contactId)))
+    .limit(1);
 
-  return JSON.stringify({ success: true, reason: args.reason });
+  if (row) {
+    await sendEscalationEmail({ ...row, conversationId: ctx.conversationId, reason: args.reason });
+  }
+
+  return json({ success: true, note: "A team member will take over. Tell the customer someone will follow up shortly." });
 };
 
-// ── Dispatcher ────────────────────────────────────────────────────────────────
-export const dispatchToolCall = async (
-  name: string,
-  args: unknown,
-  ctx: HandlerContext,
-): Promise<string> => {
+export const dispatchToolCall = async (name: string, args: unknown, ctx: HandlerContext): Promise<string> => {
   switch (name) {
-    case "listServices":     return handleListServices(args, ctx);
-    case "getAvailability":  return handleGetAvailability(args, ctx);
-    case "proposeSlots":     return handleProposeSlots(args, ctx);
-    case "bookAppointment":  return handleBookAppointment(args, ctx);
-    case "cancelAppointment": return handleCancelAppointment(args, ctx);
-    case "captureLead":      return handleCaptureLead(args, ctx);
-    case "escalateToHuman":  return handleEscalateToHuman(args, ctx);
+    case "listServices":
+      return handleListServices(args, ctx);
+    case "proposeSlots":
+      return handleProposeSlots(args, ctx);
+    case "bookAppointment":
+      return handleBookAppointment(args, ctx);
+    case "cancelAppointment":
+      return handleCancelAppointment(args, ctx);
+    case "captureLead":
+      return handleCaptureLead(args, ctx);
+    case "escalateToHuman":
+      return handleEscalateToHuman(args, ctx);
     default:
-      return JSON.stringify({ error: `Unknown tool: ${name}` });
+      return json({ error: `Unknown tool: ${name}` });
   }
 };

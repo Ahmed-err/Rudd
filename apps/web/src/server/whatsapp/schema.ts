@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 
-export const waTextMessageSchema = z.object({
+export const waChangeValueSchema = z.object({
   messaging_product: z.literal("whatsapp"),
   metadata: z.object({
     display_phone_number: z.string(),
@@ -23,6 +23,28 @@ export const waTextMessageSchema = z.object({
         timestamp: z.string(),
         type: z.string(),
         text: z.object({ body: z.string() }).optional(),
+        interactive: z
+          .object({
+            type: z.string(),
+            button_reply: z.object({ id: z.string(), title: z.string() }).optional(),
+            list_reply: z
+              .object({ id: z.string(), title: z.string(), description: z.string().optional() })
+              .optional(),
+          })
+          .optional(),
+        button: z.object({ text: z.string(), payload: z.string().optional() }).optional(),
+        audio: z.object({ id: z.string(), mime_type: z.string().optional() }).optional(),
+        image: z.object({ id: z.string(), caption: z.string().optional() }).optional(),
+        video: z.object({ id: z.string(), caption: z.string().optional() }).optional(),
+        document: z.object({ id: z.string(), caption: z.string().optional() }).optional(),
+        location: z
+          .object({
+            latitude: z.number(),
+            longitude: z.number(),
+            name: z.string().optional(),
+            address: z.string().optional(),
+          })
+          .optional(),
       }),
     )
     .optional(),
@@ -46,7 +68,7 @@ export const waWebhookPayloadSchema = z.object({
       id: z.string(),
       changes: z.array(
         z.object({
-          value: waTextMessageSchema,
+          value: waChangeValueSchema,
           field: z.string(),
         }),
       ),
@@ -55,3 +77,4 @@ export const waWebhookPayloadSchema = z.object({
 });
 
 export type WaWebhookPayload = z.infer<typeof waWebhookPayloadSchema>;
+export type WaInboundMessage = NonNullable<z.infer<typeof waChangeValueSchema>["messages"]>[number];

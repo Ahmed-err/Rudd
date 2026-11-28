@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, uuid, jsonb, varchar, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { pgTable, text, timestamp, uuid, jsonb, varchar, uniqueIndex, boolean, index } from "drizzle-orm/pg-core";
 
 // ── Tenants (mirrors Clerk Organizations) ─────────────────────────────────────
 export const tenants = pgTable("tenants", {
@@ -14,8 +15,9 @@ export const tenants = pgTable("tenants", {
 // ── WhatsApp Accounts ──────────────────────────────────────────────────────────
 export const waAccounts = pgTable("wa_accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
-  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
-  phoneNumberId: text("phone_number_id").notNull(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }).unique(),
+  // Unique so inbound webhooks can only ever route to one tenant.
+  phoneNumberId: text("phone_number_id").notNull().unique(),
   businessAccountId: text("business_account_id").notNull(),
   encryptedAccessToken: text("encrypted_access_token").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -66,6 +68,8 @@ export const conversations = pgTable("conversations", {
   contactId: uuid("contact_id").notNull().references(() => contacts.id),
   assistantThreadId: text("assistant_thread_id"),
   status: varchar("status", { length: 64 }).notNull().default("active"), // active | resolved | escalated
+  // Set when a human takes over; the AI stays silent until the owner resumes it.
+  aiPaused: boolean("ai_paused").notNull().default(false),
   lastMessageAt: timestamp("last_message_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [uniqueIndex("conversations_tenant_contact_idx").on(t.tenantId, t.contactId)]);
@@ -81,7 +85,7 @@ export const messages = pgTable("messages", {
   body: text("body"),
   toolCalls: jsonb("tool_calls"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => [index("messages_conversation_created_idx").on(t.conversationId, t.createdAt)]);
 
 // ── Appointments ───────────────────────────────────────────────────────────────
 export const appointments = pgTable("appointments", {
@@ -96,7 +100,13 @@ export const appointments = pgTable("appointments", {
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => [
+  // Last line of defence against two concurrent bookings of the same start time.
+  uniqueIndex("appointments_tenant_start_scheduled_idx")
+    .on(t.tenantId, t.startAt)
+    .where(sql`${t.status} = 'scheduled'`),
+  index("appointments_tenant_start_idx").on(t.tenantId, t.startAt),
+]);
 
 // ── Raw Webhook Events (for replay / debugging) ────────────────────────────────
 export const webhookEvents = pgTable("webhook_events", {

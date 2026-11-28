@@ -1,50 +1,40 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { exchangeCodeAndStore } from "@/server/calendar/client";
-import { z } from "zod";
+import { getApiTenant } from "@/lib/session";
+import { safeEqual } from "@/server/safe-equal";
 
-const stateSchema = z.object({
-  tenantId: z.string().uuid(),
-  nonce: z.string(),
-});
+const settingsUrl = (request: NextRequest, query: string): URL =>
+  new URL(`/dashboard/settings?${query}`, request.url);
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
-  const rawState = searchParams.get("state");
-  const error = searchParams.get("error");
+  const state = searchParams.get("state");
 
-  if (error) {
-    return NextResponse.redirect(new URL("/dashboard/settings?error=google_denied", request.url));
+  if (searchParams.get("error")) {
+    return NextResponse.redirect(settingsUrl(request, "error=google_denied"));
   }
-
-  if (!code || !rawState) {
+  if (!code || !state) {
     return NextResponse.json({ error: "Missing code or state" }, { status: 400 });
-  }
-
-  let state: z.infer<typeof stateSchema>;
-  try {
-    state = stateSchema.parse(JSON.parse(Buffer.from(rawState, "base64url").toString()));
-  } catch {
-    return NextResponse.json({ error: "Invalid state" }, { status: 400 });
   }
 
   const cookieStore = await cookies();
   const storedNonce = cookieStore.get("gcal_oauth_nonce")?.value;
-  if (!storedNonce || storedNonce !== state.nonce) {
+  cookieStore.delete("gcal_oauth_nonce");
+  if (!storedNonce || !safeEqual(storedNonce, state)) {
     return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
   }
-  cookieStore.delete("gcal_oauth_nonce");
+
+  const tenant = await getApiTenant();
+  if (!tenant) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    await exchangeCodeAndStore(state.tenantId, code);
+    await exchangeCodeAndStore(tenant.tenantId, code);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[oauth/google] exchange failed:", msg);
-    return NextResponse.redirect(
-      new URL(`/dashboard/settings?error=${encodeURIComponent(msg)}`, request.url),
-    );
+    console.error("[oauth/google] exchange failed:", err instanceof Error ? err.message : "unknown");
+    return NextResponse.redirect(settingsUrl(request, "error=google_exchange"));
   }
 
-  return NextResponse.redirect(new URL("/dashboard/settings?success=google_connected", request.url));
+  return NextResponse.redirect(settingsUrl(request, "success=google_connected"));
 }

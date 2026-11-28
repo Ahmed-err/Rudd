@@ -8,7 +8,7 @@ import { getLocale } from "@/lib/i18n/server";
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 const notoArabic = Noto_Sans_Arabic({ subsets: ["arabic"], variable: "--font-arabic" });
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://rudd-web.vercel.app";
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://rudd.sarmadax.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),

@@ -18,10 +18,16 @@ export const WhatsAppSetup = ({ connected, t }: Props) => {
   const [businessAccountId, setBusinessAccountId] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState("");
 
   const handleSave = () => {
+    setError("");
     startTransition(async () => {
-      await saveWhatsAppCredentials({ phoneNumberId, businessAccountId, accessToken });
+      const result = await saveWhatsAppCredentials({ phoneNumberId, businessAccountId, accessToken });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       setPhoneNumberId("");
       setBusinessAccountId("");
       setAccessToken("");
@@ -54,6 +60,9 @@ export const WhatsAppSetup = ({ connected, t }: Props) => {
 
   return (
     <div className="space-y-3 max-w-sm">
+      {error && (
+        <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800">{error}</div>
+      )}
       <div className="space-y-1">
         <Label>{t.waPhoneNumberId}</Label>
         <Input

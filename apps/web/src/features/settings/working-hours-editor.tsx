@@ -4,40 +4,10 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { saveWorkingHours } from "./actions";
 import { cn } from "@/lib/utils";
+import { DAY_KEYS as DAYS, DEFAULT_WORKING_HOURS as DEFAULT_HOURS, parseWorkingHours as parseInitial, type WorkingHours } from "@rudd/shared";
 import type { T } from "@/lib/i18n/translations";
 
-type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
-type DaySchedule = { enabled: boolean; open: string; close: string };
-type WorkingHours = Record<DayKey, DaySchedule>;
-
-const DAYS: DayKey[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-
-const DEFAULT_HOURS: WorkingHours = {
-  mon: { enabled: true, open: "09:00", close: "17:00" },
-  tue: { enabled: true, open: "09:00", close: "17:00" },
-  wed: { enabled: true, open: "09:00", close: "17:00" },
-  thu: { enabled: true, open: "09:00", close: "17:00" },
-  fri: { enabled: true, open: "09:00", close: "17:00" },
-  sat: { enabled: false, open: "09:00", close: "17:00" },
-  sun: { enabled: false, open: "09:00", close: "17:00" },
-};
-
-const parseInitial = (raw: unknown): WorkingHours => {
-  if (!raw || typeof raw !== "object") return DEFAULT_HOURS;
-  const obj = raw as Partial<Record<DayKey, Partial<DaySchedule>>>;
-  const result = { ...DEFAULT_HOURS };
-  for (const day of DAYS) {
-    const d = obj[day];
-    if (d) {
-      result[day] = {
-        enabled: typeof d.enabled === "boolean" ? d.enabled : result[day]?.enabled,
-        open: typeof d.open === "string" ? d.open : result[day]?.open,
-        close: typeof d.close === "string" ? d.close : result[day]?.close,
-      };
-    }
-  }
-  return result;
-};
+type DayKey = keyof WorkingHours;
 
 type Props = {
   initial: unknown;

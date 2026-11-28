@@ -1,10 +1,16 @@
 import "server-only";
-import { db, googleAccounts } from "@rudd/db";
-import { eq } from "drizzle-orm";
+import { db, googleAccounts, withTenant } from "@rudd/db";
 import { decrypt, encrypt } from "@/server/crypto";
 import { env } from "@/lib/env";
 
 const GCAL_TIMEOUT_MS = 8_000;
+
+export class CalendarNotConnectedError extends Error {
+  override readonly name = "CalendarNotConnectedError";
+  constructor() {
+    super("No Google Calendar connected");
+  }
+}
 
 // ── Token management ───────────────────────────────────────────────────────────
 
@@ -14,7 +20,14 @@ type TokenSet = {
   expires_in: number;
 };
 
-const refreshAccessToken = async (refreshToken: string): Promise<string> => {
+const tokenCache = new Map<string, { accessToken: string; calendarId: string; expiresAt: number }>();
+const EXPIRY_MARGIN_MS = 60_000;
+
+export const clearCalendarTokenCache = (tenantId: string): void => {
+  tokenCache.delete(tenantId);
+};
+
+const refreshAccessToken = async (refreshToken: string): Promise<{ accessToken: string; expiresIn: number }> => {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -28,32 +41,40 @@ const refreshAccessToken = async (refreshToken: string): Promise<string> => {
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Token refresh failed: ${err}`);
+    throw new Error(`Google token refresh failed with status ${res.status}`);
   }
 
   const data = (await res.json()) as TokenSet;
-  return data.access_token;
+  return { accessToken: data.access_token, expiresIn: data.expires_in };
 };
 
 const getAccessTokenForTenant = async (
   tenantId: string,
 ): Promise<{ accessToken: string; calendarId: string }> => {
+  const cached = tokenCache.get(tenantId);
+  if (cached && cached.expiresAt > Date.now()) return cached;
+
   const [account] = await db
     .select({
       encryptedRefreshToken: googleAccounts.encryptedRefreshToken,
       calendarId: googleAccounts.calendarId,
     })
     .from(googleAccounts)
-    .where(eq(googleAccounts.tenantId, tenantId))
+    .where(withTenant(tenantId, googleAccounts.tenantId))
     .limit(1);
 
-  if (!account) throw new Error(`No Google account connected for tenant ${tenantId}`);
+  if (!account) throw new CalendarNotConnectedError();
 
   const refreshToken = await decrypt(account.encryptedRefreshToken);
-  const accessToken = await refreshAccessToken(refreshToken);
+  const { accessToken, expiresIn } = await refreshAccessToken(refreshToken);
 
-  return { accessToken, calendarId: account.calendarId };
+  const entry = {
+    accessToken,
+    calendarId: account.calendarId,
+    expiresAt: Date.now() + expiresIn * 1000 - EXPIRY_MARGIN_MS,
+  };
+  tokenCache.set(tenantId, entry);
+  return entry;
 };
 
 // ── OAuth URL generation ───────────────────────────────────────────────────────
@@ -95,7 +116,7 @@ export const exchangeCodeAndStore = async (
   });
 
   if (!res.ok) {
-    throw new Error(`Token exchange failed: ${await res.text()}`);
+    throw new Error(`Google token exchange failed with status ${res.status}`);
   }
 
   const tokens = (await res.json()) as TokenSet;
@@ -114,6 +135,7 @@ export const exchangeCodeAndStore = async (
       target: googleAccounts.tenantId,
       set: { encryptedRefreshToken, calendarId, scopes, updatedAt: new Date() },
     });
+  clearCalendarTokenCache(tenantId);
 };
 
 // ── Free/busy query ────────────────────────────────────────────────────────────

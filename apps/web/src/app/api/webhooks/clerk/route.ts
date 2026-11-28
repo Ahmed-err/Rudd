@@ -6,6 +6,7 @@ import { db } from "@rudd/db";
 import { tenants, agentSettings } from "@rudd/db";
 import { eq } from "drizzle-orm";
 import { env } from "@/lib/env";
+import { DEFAULT_WORKING_HOURS } from "@rudd/shared";
 
 const orgEventSchema = z.object({
   type: z.string(),
@@ -17,7 +18,13 @@ const orgEventSchema = z.object({
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const secret = env.clerk.CLERK_WEBHOOK_SECRET;
+  let secret: string;
+  try {
+    secret = env.clerkWebhook.CLERK_WEBHOOK_SECRET;
+  } catch {
+    console.error("[clerk-webhook] CLERK_WEBHOOK_SECRET is not set");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+  }
   const headersList = await headers();
 
   const svixId = headersList.get("svix-id");
@@ -64,15 +71,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           tenantId: tenant.id,
           businessName: name,
           timezone: "UTC",
-          workingHours: {
-            mon: { enabled: true, open: "09:00", close: "17:00" },
-            tue: { enabled: true, open: "09:00", close: "17:00" },
-            wed: { enabled: true, open: "09:00", close: "17:00" },
-            thu: { enabled: true, open: "09:00", close: "17:00" },
-            fri: { enabled: true, open: "09:00", close: "17:00" },
-            sat: { enabled: false, open: "09:00", close: "17:00" },
-            sun: { enabled: false, open: "09:00", close: "17:00" },
-          },
+          workingHours: DEFAULT_WORKING_HOURS,
           services: [],
         })
         .onConflictDoNothing({ target: agentSettings.tenantId });

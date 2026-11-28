@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,10 @@ export const SetupForm = ({ defaultBusinessName, t }: Props) => {
   const [isPending, startTransition] = useTransition();
   const [businessName, setBusinessName] = useState(defaultBusinessName);
   const [timezone, setTimezone] = useState("UTC");
+  useEffect(() => {
+    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (detected) setTimezone(detected);
+  }, []);
   const [services, setServices] = useState<Service[]>([
     { id: "consult", name: "Consultation", duration_minutes: 30 },
   ]);

@@ -5,7 +5,7 @@ export const metadata = {
 export default function PrivacyPage() {
   const updated = "April 28, 2026";
   const contact = "hello@sarmadax.com";
-  const appUrl = "https://rudd-web.vercel.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://rudd.sarmadax.com";
 
   return (
     <main className="max-w-3xl mx-auto px-6 py-12 prose prose-neutral">
