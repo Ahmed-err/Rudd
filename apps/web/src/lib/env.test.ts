@@ -31,6 +31,20 @@ describe("env", () => {
     expect(() => env.crypto.ENCRYPTION_KEY).toThrow(/ENCRYPTION_KEY/);
   });
 
+  it("does not require the Clerk webhook secret at startup", async () => {
+    const required = {
+      META_APP_SECRET: "x", WHATSAPP_VERIFY_TOKEN: "x",
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk", CLERK_SECRET_KEY: "sk", CLERK_WEBHOOK_SECRET: "",
+      GROQ_API_KEY: "g", GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "s",
+      GOOGLE_REDIRECT_URI: "https://example.com/cb", DATABASE_URL: "postgres://u:p@h/db",
+      ENCRYPTION_KEY: "a".repeat(64),
+    };
+    for (const [k, v] of Object.entries(required)) vi.stubEnv(k, v);
+    const { env, validateEnvAtStartup } = await loadEnv();
+    expect(validateEnvAtStartup).not.toThrow();
+    expect(() => env.clerkWebhook.CLERK_WEBHOOK_SECRET).toThrow(/CLERK_WEBHOOK_SECRET/);
+  });
+
   it("reports every missing group at startup", async () => {
     for (const key of ["META_APP_SECRET", "CLERK_SECRET_KEY", "DATABASE_URL", "GROQ_API_KEY", "OPENAI_API_KEY"]) {
       vi.stubEnv(key, "");

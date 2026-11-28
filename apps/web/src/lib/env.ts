@@ -11,6 +11,10 @@ const whatsappWebhookSchema = z.object({
 const clerkSchema = z.object({
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
   CLERK_SECRET_KEY: z.string().min(1),
+});
+
+// Only the Clerk webhook route needs this, so a missing value must not stop the whole app booting.
+const clerkWebhookSchema = z.object({
   CLERK_WEBHOOK_SECRET: z.string().min(1),
 });
 
@@ -95,6 +99,7 @@ const makeGroup = <S extends z.ZodTypeAny>(schema: S, label: string) => {
 const groups = {
   whatsappWebhook: makeGroup(whatsappWebhookSchema, "whatsapp.webhook"),
   clerk: makeGroup(clerkSchema, "clerk"),
+  clerkWebhook: makeGroup(clerkWebhookSchema, "clerk.webhook"),
   llm: makeGroup(llmSchema, "llm"),
   google: makeGroup(googleSchema, "google"),
   db: makeGroup(dbSchema, "db"),
@@ -124,6 +129,7 @@ export const validateEnvAtStartup = (): void => {
 export const env = {
   whatsappWebhook: groups.whatsappWebhook.proxy,
   clerk: groups.clerk.proxy,
+  clerkWebhook: groups.clerkWebhook.proxy,
   llm: groups.llm.proxy,
   google: groups.google.proxy,
   db: groups.db.proxy,

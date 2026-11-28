@@ -18,7 +18,13 @@ const orgEventSchema = z.object({
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const secret = env.clerk.CLERK_WEBHOOK_SECRET;
+  let secret: string;
+  try {
+    secret = env.clerkWebhook.CLERK_WEBHOOK_SECRET;
+  } catch {
+    console.error("[clerk-webhook] CLERK_WEBHOOK_SECRET is not set");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+  }
   const headersList = await headers();
 
   const svixId = headersList.get("svix-id");
